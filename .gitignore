@@ -1,0 +1,122 @@
+# =========================
+
+# 🔐 ENV & SECRETS
+
+# =========================
+
+.env
+.env.*
+*.env
+*.key
+*.pem
+
+# =========================
+
+# 🐍 PYTHON
+
+# =========================
+
+**pycache**/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+
+venv/
+env/
+ENV/
+.venv/
+
+# =========================
+
+# 📦 DEPENDENCIES / BUILD
+
+# =========================
+
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# =========================
+
+# 🧪 TESTING / CACHE
+
+# =========================
+
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# =========================
+
+# 📝 LOGS
+
+# =========================
+
+*.log
+logs/
+
+# =========================
+
+# 🧠 ML / AI (optional heavy files)
+
+# =========================
+
+models/
+*.pt
+*.pth
+*.onnx
+*.bin
+
+# =========================
+
+# 🗄️ DATABASE / LOCAL FILES
+
+# =========================
+
+*.sqlite3
+*.db
+
+# =========================
+
+# 🧰 EDITOR / IDE
+
+# =========================
+
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# =========================
+
+# 🌐 NODE (for integration layer if in same repo)
+
+# =========================
+
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# =========================
+
+# 🚀 FLASK
+
+# =========================
+
+instance/
+.webassets-cache
+
+# =========================
+
+# 🧾 MISC
+
+# =========================
+
+*.bak
+*.tmp
+*.temp
