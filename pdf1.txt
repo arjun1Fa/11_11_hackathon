@@ -1,0 +1,391 @@
+﻿Smartilee
+
+AI / Backend Engineer ù Study Abroad Edition
+
+Hackathon 2025 ╖ Final Workflow Guide ╖ v2.0
+
+Your Role in One Line
+
+You are the brain of Smartilee. You build the Flask server that understands every WhatsApp message from a
+
+prospective student ù what country they are interested in, which package they are asking about, how they
+
+feel, what language they speak, and what their consultation history is ù and generates a personalised reply
+
+grounded in the study abroad consultancy's real package data using RAG. Every other component depends
+
+on your endpoints working.
+
+THE TWO BIG CONCEPTS YOU OWN
+
+Concept 1 ù RAG (Retrieval Augmented Generation)
+The LLM on its own knows nothing about your consultancy's packages, pricing, or visa rules. RAG fixes this.
+
+Before the LLM generates any reply, your system first searches the knowledge_base table in Supabase for
+
+the most relevant rows ù Germany tuition fees, France scholarship details, Netherlands visa process,
+
+eligibility criteria, intake dates ù and injects them into the LLM prompt as context. The LLM then answers
+from your real package data, not from generic internet knowledge. The student gets an accurate, specific
+
+answer every single time. The updated match_knowledge_base RPC accepts filter_country and
+
+filter_category parameters ù when a student specifies Germany, pass filter_country='Germany' to retrieve
+
+only Germany-relevant rows.
+
+Concept 2 ù Ollama (Local LLM)
+Groq runs the LLM on their cloud servers. Ollama runs the exact same LLM on your own machine ù no API
+
+key, no credits, no data leaving your infrastructure. For the hackathon demo you use Groq because it is
+
+sub-second fast. But the Flask backend is architected so switching to Ollama is one environment variable
+
+change. Same code, different base URL. This is your production path.
+
+TECH STACK YOU OWN
+
+╖ Python + Flask ù your server framework
+
+╖ Groq API (free, no credit card) with LLaMA 3 70B ù demo LLM
+
+╖ Ollama (local) with LLaMA 3.1 8B or Mistral 7B ù production LLM
+
+╖ LangChain ù prompt chaining, RAG pipeline, output parsing
+
+╖ langdetect ù language identification before reply generation
+
+╖ Supabase Python client ù student profiles + pgvector RAG search
+
+╖ pgvector ù semantic vector search on study abroad knowledge base
+
+╖ python-dotenv ù environment variable management
+
+FEATURES YOU BUILD
+
+Intent detection
+
+Classify every student message into one of 6 labels (see below)
+
+Sentiment analysis
+
+Positive / neutral / negative ù drives escalation decisions
+
+Language detection
+
+Identify student's language (ml/hi/ta/en/etc.) before generating any reply
+
+RAG pipeline
+
+Decision engine
+
+Retrieve relevant package data (tuition, visa, scholarships) before every reply ù with
+optional filter_country for precision
+
+Route to auto_reply / upsell / handoff / schedule_followup based on intent + sentiment +
+churn
+
+Personalised replies
+
+LLM reply grounded in consultancy's knowledge base, addressed by student's first name
+
+Upsell logic
+
+Suggest relevant packages or upgrades naturally within conversation
+
+Churn scoring
+
+Weighted formula using days_inactive, abandoned_enquiries, and message_drop_rate
+
+Multilingual replies
+
+Respond in student's detected language ù Malayalam, Hindi, Tamil, English, etc.
+
+HOW THE RAG PIPELINE WORKS FOR STUDY ABROAD
+
+Step 1
+
+Step 2
+
+Step 3
+
+Step 4
+
+load_knowledge_base() at startup
+Reads all rows from the knowledge_base table in Supabase (Germany/France/Netherlands package data,
+visa rules, scholarship details, FAQs, intake dates). Converts each row's content into a vector embedding
+and stores it in Supabase using pgvector.
+
+retrieve_context(message_text, country=None) on every message
+Converts the student's message into a vector. If the student has a preferred_country in their profile (e.g.
+'Germany'), calls match_knowledge_base with filter_country='Germany' for more precise results. Returns
+the top 4 most semantically relevant knowledge base rows.
+
+Inject retrieved rows into the LLM prompt
+The prompt says: 'Here is the relevant information from our study abroad packages: [rows]. Using ONLY this
+information, answer the student's question in [language]. Do not invent fees, dates, or scholarship amounts
+not in the context.'
+
+LLM generates reply and it goes back to the student
+Groq LLaMA 3 generates a natural, accurate, personalised reply. Integration engineer sends it back via
+WhatsApp through Happilee.
+
+FLASK ENDPOINTS YOU MUST BUILD
+
+POST /analyze
+Input: { phone_number, message_text }
+
+Output: { intent, sentiment, language, action, churn_score, risk_level, preferred_country }
+
+Main endpoint called by the Integration engineer for every incoming student message. Runs the full pipeline: language
+detection -> fetch customer profile (get preferred_country) -> RAG context retrieval (with filter_country if known) ->
+intent detection -> sentiment analysis -> churn scoring -> decision engine.
+
+POST /generate-reply
+Input: { phone_number, message_text, intent, sentiment, language }
+
+Output: { reply_text }
+
+Fetches student profile from Supabase (name, preferred_country, education_level, field_of_study, ielts_score,
+tone_preference). Retrieves RAG context filtered by country if available. Builds personalised prompt with both student
+profile and package data injected. Calls Groq or Ollama. Returns reply text.
+
+POST /upsell
+Input: { phone_number, message_text }
+
+Output: { upsell_message }
+
+Fetches student profile and relevant package details from Supabase. Generates a reply that acknowledges the
+student's current country interest, then naturally introduces a related package benefit or scholarship they may not have
+asked about.
+
+POST /churn-score
+Input: { phone_number }
+
+Output: { churn_score, risk_level }
+
+Computes churn score from enquiry_events (abandoned_enquiries) and conversations table (message frequency drop).
+Uses enquiry_events instead of cart_events ù table name change from original schema.
+
+GET /health
+
+Output: { status: ok, llm_provider: groq|ollama }
+
+Confirms the Flask server is alive and which LLM provider is active.
+
+INTENT LABELS ù STUDY ABROAD CONTEXT
+
+package_enquiry
+
+Student asking about a specific country package, fees, or services
+
+visa_question
+
+Questions about visa process, blocked account, APS, MVV, Campus France
+
+scholarship_query
+
+Asking about DAAD, Eiffel, Holland Scholarship, or other funding
+
+complaint
+
+churn_risk
+
+general
+
+Student is unhappy ù delayed response, incorrect info, pricing concern
+
+Signalling disengagement ù 'I'm looking at other consultancies', long silence
+
+Casual conversation, greeting, or unclassified message
+
+CHURN SCORING FORMULA ù UPDATED FOR STUDY ABROAD
+
+score = (0.5 * days_inactive_norm) + (0.3 * abandoned_enquiry_rate) + (0.2 * message_drop_rate)
+
+days_inactive_norm = min(days_since_active / 30, 1.0) abandoned_enquiry_rate =
+
+abandoned_enquiries / max(total_enquiries, 1) # from enquiry_events table message_drop_rate = 1
+
+- (last7 / max(prior7, 1)), clipped to [0, 1] Above 0.7 = high risk. 0.4 to 0.7 = medium. Below
+
+0.4 = healthy. NOTE: 'abandoned_enquiries' replaces 'abandoned_carts' from the original schema.
+
+Query: SELECT COUNT(*) FROM enquiry_events WHERE customer_id=X AND status='abandoned'
+
+GROQ VS OLLAMA ù HOW TO SWITCH
+
+In your Flask app, the entire LLM call goes through one function. The only difference between Groq and
+
+Ollama is the base_url and whether an API key is needed. LangChain's ChatOpenAI interface supports both.
+
+Groq: base_url='https://api.groq.com/openai/v1', api_key=GROQ_API_KEY Ollama:
+
+base_url='http://localhost:11434/v1', api_key='ollama' Set LLM_PROVIDER=groq or
+
+LLM_PROVIDER=ollama in your .env file. Your Flask app reads this on startup and initialises the
+
+correct client. One variable change, zero code change.
+
+MASTER PROMPTS ù INPUT INTO AI ONE BY ONE
+
+PROMPT 1 ù Project Setup
+
+I am building the AI backend for a WhatsApp AI platform called Smartilee, used by a study abroad consultancy. Stack:
+Python + Flask, Groq API free tier with LLaMA 3, LangChain, langdetect, Supabase Python client with pgvector for
+RAG, python-dotenv. Create the full project structure: smartilee-ai/ app.py (Flask entry point), intelligence.py (intent,
+sentiment, language detection), decision_engine.py (routing logic), reply_generator.py (LLM reply generation with
+RAG), churn_scorer.py (churn computation), rag.py (RAG pipeline: embed, store, retrieve). requirements.txt: flask, groq,
+langchain, langchain-groq, langchain-openai, langdetect, supabase, python-dotenv, openai. .env.example:
+GROQ_API_KEY=, SUPABASE_URL=, SUPABASE_KEY=, FLASK_PORT=5000, LLM_PROVIDER=groq,
+OLLAMA_BASE_URL=http://localhost:11434/v1. app.py: Flask initialised, Supabase client connected via dotenv, LLM
+client initialised based on LLM_PROVIDER env var, GET /health returning {status: ok, llm_provider: groq|ollama}. Show
+all files in full.
+
+PROMPT 2 ù RAG Pipeline (Study Abroad Knowledge Base)
+
+In my Smartilee Flask backend for a study abroad consultancy, build rag.py ù the full RAG pipeline. The knowledge
+base is stored in a Supabase table called knowledge_base: id uuid PK, package_id text, country text, category text, title
+text, content text, embedding vector(1536). Build these functions: 1. get_embedding(text: str) -> list[float]: Use
+OpenAI-compatible embedding via Groq or Ollama nomic-embed-text. 2. load_knowledge_base(): Reads all rows from
+knowledge_base table. For each row with no embedding yet, calls get_embedding(content) and updates embedding
+column. Print progress. Call once at Flask startup. 3. retrieve_context(query: str, top_k: int = 4, filter_country: str =
+None, filter_category: str = None) -> str: Converts query to embedding, calls Supabase RPC
+match_knowledge_base(query_embedding, top_k, filter_country, filter_category). Returns top_k matching content
+strings joined as a single context string. Pass filter_country when the student's preferred_country is known for more
+precise retrieval. Show complete rag.py and the SQL for match_knowledge_base RPC with optional filter params.
+
+PROMPT 3 ù Intelligence + Decision Engine (Study Abroad)
+
+In my Smartilee Flask backend for a study abroad consultancy, build intelligence.py and decision_engine.py.
+intelligence.py: 1. detect_language(text) -> str: Uses langdetect. Returns 'en'/'hi'/'ml'/'ta'/etc. Fallback: 'en'. 2.
+detect_intent(message_text, context: str = '') -> str: Uses LangChain PromptTemplate + ChatGroq llama3-8b-8192.
+Returns exactly one of: package_enquiry, visa_question, scholarship_query, complaint, churn_risk, general. 3.
+detect_sentiment(message_text) -> str: Returns positive, neutral, or negative. decision_engine.py: decide_action(intent,
+sentiment, churn_score, has_active_enquiry) -> str. Returns: auto_reply, upsell, handoff, or schedule_followup. Priority
+rules: 1. sentiment==negative AND intent==complaint -> handoff. 2. churn_score > 0.7 -> schedule_followup. 3.
+intent==package_enquiry AND sentiment==positive -> upsell (suggest related scholarship or package upgrade). 4.
+has_active_enquiry==True AND intent==package_enquiry -> auto_reply. 5. Default -> auto_reply. Include type hints,
+docstrings, 6 pytest unit tests.
+
+PROMPT 4 ù Reply Generator + Churn Scorer (Study Abroad)
+
+In my Smartilee Flask backend for a study abroad consultancy, build reply_generator.py and churn_scorer.py.
+reply_generator.py: 1. generate_reply(message_text, intent, sentiment, language, student_profile: dict, rag_context: str)
+-> str. student_profile keys: name, language, tone_preference, preferred_country, education_level, field_of_study,
+ielts_score, churn_score. rag_context: string of relevant study abroad package data retrieved by RAG. LangChain
+PromptTemplate instructions: You are a helpful study abroad counsellor assistant. Use ONLY the following package
+information to answer: {rag_context}. Respond ONLY in {language}. Address the student by first name: {name}. They
+are interested in {preferred_country} for {education_level} in {field_of_study}. Match tone_preference: formal=respectful,
+casual=warm and friendly. Keep reply under 3 sentences. This is WhatsApp, not email. Never sound like a bot. Never
+invent fees, dates, or scholarship amounts not in rag_context. 2. upsell_reply(message_text, student_profile: dict,
+packages_list: list[dict], rag_context: str) -> str: Acknowledge student's current country interest first, then recommend
+ONE relevant package benefit or scholarship they haven't mentioned. churn_scorer.py:
+compute_churn_score(phone_number: str) -> dict. Query Supabase for last_active, abandoned enquiries from
+enquiry_events table (status='abandoned'), message counts from conversations. score = (0.5*days_inactive_norm) +
+(0.3*abandoned_enquiry_rate) + (0.2*message_drop_rate). Return: { churn_score: float, risk_level: high|medium|low }.
+
+PROMPT 5 ù Wire All Endpoints in app.py
+
+In my Smartilee Flask backend for a study abroad consultancy, complete app.py with all endpoints. POST /analyze:
+detect_language(message_text) -> fetch customer profile (get preferred_country, education_level) ->
+retrieve_context(message_text, filter_country=customer.preferred_country) from rag.py -> detect_intent(message_text,
+context) -> detect_sentiment(message_text) -> compute_churn_score(phone_number) -> get customer
+has_active_enquiry from enquiry_events table (status='active') -> decide_action(intent, sentiment, churn_score,
+has_active_enquiry) -> Return: {intent, sentiment, language, action, churn_score, risk_level, preferred_country}. POST
+/generate-reply: Fetch student_profile from Supabase by phone_number (including preferred_country, education_level,
+field_of_study, ielts_score) -> retrieve_context(message_text, filter_country=profile.preferred_country) ->
+generate_reply(message_text, intent, sentiment, language, student_profile, rag_context) -> Return: {reply_text}. POST
+/upsell: Fetch student_profile + packages_list + retrieve_context -> upsell_reply(...) -> Return: {upsell_message}. POST
+/churn-score: calls compute_churn_score, returns result. GET /health: returns {status: ok, llm_provider: groq|ollama}. All
+endpoints: JSON responses, try/except, {error: str} + HTTP 500 on failure. Log all errors to stderr.
+
+SMARTILEE ù COMPLETE HACKATHON TIMELINE (6 HOURS)
+
+Hour 1
+
+Foundation ù DB deploys first, everyone scaffolds
+DB Engineer: Create Supabase project, run full SQL migration (all 8 tables including packages +
+knowledge_base), enable real-time on enquiry_events + handoff_queue, seed demo data (3 packages, 3
+customers, knowledge base rows), share SUPABASE_URL + SUPABASE_KEY with team. AI Engineer: Set
+up Flask project, install all dependencies, sign up on console.groq.com, get free API key, test basic Groq
+call, set up Ollama locally as backup, confirm /health endpoint returns {status: ok}. Integration: Set up
+Node.js + Express project, install dependencies, install ngrok, register on happilee.io, get sandbox number,
+configure Happilee webhook to ngrok URL, send test WhatsApp message and confirm it hits Express server.
+Frontend: Create Flutter project, add all pubspec.yaml dependencies, initialise Supabase in main.dart,
+create all model classes (Customer, Conversation, EnquiryEvent, Package), build SupabaseService
+singleton, build basic navigation shell.
+
+Hour 2
+
+Hour 3
+
+Hour 4
+
+Hour 5
+
+Core intelligence + Core UI
+DB Engineer: Write and share all query functions (Python + JS versions): upsert_customer,
+get_customer_profile, log_conversation, get_conversations, get_dashboard_stats, get_all_packages.
+Embed knowledge base rows into pgvector. Stay on standby. AI Engineer: Build intelligence.py:
+detect_language, detect_intent, detect_sentiment using LangChain + Groq LLaMA 3. Build RAG layer:
+load_knowledge_base(), retrieve_context() using pgvector similarity search. Test intent detection with
+sample student messages. Integration: Build POST /webhook endpoint, parse Happilee payload, call mock
+/analyze returning hardcoded auto_reply, build sendMessage() and sendTemplate() outbound functions, test
+WhatsApp message in -> hardcoded reply sent back. Log inbound messages to Supabase. Frontend: Build
+DashboardScreen: 4 StatCards + bar chart (fl_chart), connect to Supabase with real queries, 30s refresh
+Timer. Build ConversationsScreen: ListView with IntentBadge widgets, Supabase real-time subscription,
+highlight animation.
+
+Complete AI backend + Connect integration
+AI Engineer: Build decision_engine.py with all 4 routing rules. Build POST /analyze endpoint (full pipeline):
+detect_language -> retrieve_context (RAG) -> detect_intent -> detect_sentiment -> compute_churn_score ->
+decide_action. Test /analyze with Postman using demo student data. Target: /analyze fully working by end of
+Hour 3. Integration: Replace mock /analyze with real Flask /analyze call. Build full routing logic for all 4
+actions: auto_reply, upsell, handoff, schedule_followup. Log every inbound + outbound message to
+Supabase. Test full flow: real WhatsApp -> AI analyzes -> reply sent. Frontend: Build
+ConversationDetailScreen: WhatsApp-style chat bubbles, auto-scroll, intent caption under each AI bubble.
+Build CustomersScreen: full list with CategoryBadge, ChurnScoreBar, search bar, category filter chips. DB
+Engineer: Verify seed data is clean, fix any schema issues, help other engineers with Supabase query
+debugging.
+
+All features complete
+AI Engineer: Build reply_generator.py: generate_reply() + upsell_reply() with full RAG-injected personalised
+prompts. Build churn_scorer.py: compute_churn_score() using enquiry_events instead of cart_events. Build
+POST /generate-reply, POST /upsell, POST /churn-score. All 5 Flask endpoints working and tested end to
+end. Integration: Build handoff.js: full handoff flow ù insert handoff_queue, set is_handoff_active=true, notify
+owner on WhatsApp. Build triggers.js: enquiry abandonment real-time listener (30 min), inactivity cron job
+(node-cron 21:00 nightly). Register package_followup + reengagement templates in Happilee. Frontend:
+Build CustomerProfileScreen: 4 sections (identity with country/package/IELTS, intelligence summary,
+enquiry history, conversation history). Build HandoffQueueScreen: pending cards, Resolve button, real-time
+Supabase subscription + SnackBar alert. Build ChurnRiskScreen: high risk list, re-engagement button. DB
+Engineer: Write get_customer_enquiry_history() and get_customer_behaviour_summary() query functions.
+Share with Frontend engineer.
+
+RAG tuning + Automation + Polish
+AI Engineer: Test RAG with real study abroad questions (fees, visa, scholarships). Tune retrieval ù pass
+filter_country when student specifies Germany/France/Netherlands. Test multilingual replies (Malayalam,
+Hindi, Tamil, English). Verify all prompt outputs sound natural. Confirm Groq free tier quota is sufficient.
+Switch Ollama local as fallback. Integration: Shorten enquiry abandonment timeout to 2 mins for demo. Full
+end-to-end test: WhatsApp -> AI -> reply -> enquiry recovery -> handoff -> owner notified. Confirm ngrok is
+stable or deploy to Railway. Frontend: Connect all remaining mock data to live Supabase queries. Add
+loading indicators and empty states to every screen. Polish UI: colours, spacing, typography consistency.
+Rehearse 3-minute demo script twice. DB Engineer: Reset demo data to clean starting state. Re-run seed
+script, restore all customer records and knowledge base. Keep seed script ready to run again before
+presentation.
+
+Hour 6
+
+Full integration test + Demo prep
+ALL ENGINEERS: Run complete end-to-end demo scenario together. Fix any bugs that surface during full
+test. Verify real-time updates work across all Flutter screens. Verify multilingual reply works (send
+Malayalam, get Malayalam). Verify enquiry recovery fires correctly (2-min demo timeout). Verify handoff
+queue updates live in Flutter dashboard. DB Engineer: Final seed data reset. Keep laptop open with
+Supabase dashboard. AI Engineer: Confirm Flask server is stable. Check Groq quota. Keep Ollama running
+as hot standby. Integration: Final WhatsApp send test 10 mins before presentation. Confirm Happilee
+webhook is live and pointing correctly. Frontend: Final Flutter Web build. Run demo script one more time.
+Record a screen capture as backup for connectivity failures.
+
+Smartilee ╖ AI / Backend Engineer ╖ Study Abroad Edition ╖ Hackathon 2025 ╖ v2.0
+
+
