@@ -6,7 +6,7 @@ for every incoming student WhatsApp message.
 
 import sys
 from langdetect import detect, LangDetectException
-from langchain.prompts import PromptTemplate
+from langchain_core.prompts import PromptTemplate
 from langchain_openai import ChatOpenAI
 
 
