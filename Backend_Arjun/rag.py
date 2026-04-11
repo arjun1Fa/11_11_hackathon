@@ -45,26 +45,23 @@ def get_embedding(text: str) -> list[float]:
     try:
         from openai import OpenAI
 
-        llm_provider     = os.getenv("LLM_PROVIDER", "groq").lower()
-        groq_api_key     = os.getenv("GROQ_API_KEY", "")
-        ollama_base_url  = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
+        # Always use Ollama for embeddings, regardless of the text LLM provider
+        ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
 
-        if llm_provider == "groq":
-            client = OpenAI(
-                api_key=groq_api_key,
-                base_url="https://api.groq.com/openai/v1",
-            )
-            # Groq supports OpenAI-style embeddings
-            model = "text-embedding-ada-002"
-        else:
-            client = OpenAI(
-                api_key="ollama",
-                base_url=ollama_base_url,
-            )
-            model = "nomic-embed-text"
+        client = OpenAI(
+            api_key="ollama",
+            base_url=ollama_base_url,
+        )
+        model = "nomic-embed-text"
 
         response = client.embeddings.create(input=text, model=model)
-        return response.data[0].embedding
+        vector = response.data[0].embedding
+        
+        # Hackathon fix: Pad Ollama's 768D vector to 1536D to match the DB schema
+        if len(vector) < 1536:
+            vector.extend([0.0] * (1536 - len(vector)))
+            
+        return vector
 
     except Exception as e:
         print(f"[ERROR] get_embedding failed: {e}", file=sys.stderr)
