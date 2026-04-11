@@ -175,7 +175,7 @@ def compute_churn_score(phone_number: str, supabase: Client) -> dict:
         resp = (
             supabase.table("customers")
             .select("id, last_active")
-            .eq("phone", phone_number)
+            .eq("phone_number", phone_number)
             .single()
             .execute()
         )
