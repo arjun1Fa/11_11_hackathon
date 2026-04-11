@@ -1,6 +1,7 @@
 import os
 import sys
 from flask import Flask, jsonify
+from flask_cors import CORS
 from dotenv import load_dotenv
 from supabase import create_client, Client
 from langchain_openai import ChatOpenAI
@@ -10,6 +11,8 @@ load_dotenv()
 
 # ── App init ────────────────────────────────────────────────────────────────
 app = Flask(__name__)
+# Enable CORS so the Flutter Frontend can talk to this Flask API
+CORS(app)
 
 # ── Supabase client ──────────────────────────────────────────────────────────
 SUPABASE_URL = os.getenv("SUPABASE_URL")
