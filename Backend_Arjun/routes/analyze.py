@@ -33,7 +33,7 @@ def analyze():
         preferred_country = None
         has_active_enquiry = False
         
-        customer_resp = supabase.table("customers").select("id, preferred_country").eq("phone", phone_number).execute()
+        customer_resp = supabase.table("customers").select("id, preferred_country").eq("phone_number", phone_number).execute()
         customer = customer_resp.data[0] if customer_resp.data else None
         
         if customer:
