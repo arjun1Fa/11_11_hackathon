@@ -32,7 +32,7 @@ OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
 
 if LLM_PROVIDER == "groq":
     llm = ChatOpenAI(
-        model="llama3-70b-8192",
+        model="llama-3.3-70b-versatile",
         openai_api_key=GROQ_API_KEY,
         openai_api_base="https://api.groq.com/openai/v1",
         temperature=0.4,
