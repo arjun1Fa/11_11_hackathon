@@ -1,0 +1,9 @@
+flask
+groq
+langchain
+langchain-groq
+langchain-openai
+langdetect
+supabase
+python-dotenv
+openai
