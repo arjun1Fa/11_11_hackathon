@@ -28,7 +28,7 @@ def generate_reply_endpoint():
 
         # 1. Fetch student_profile
         profile = {}
-        customer_resp = supabase.table("customers").select("*").eq("phone", phone_number).execute()
+        customer_resp = supabase.table("customers").select("*").eq("phone_number", phone_number).execute()
         if customer_resp.data:
             profile = customer_resp.data[0]
 
