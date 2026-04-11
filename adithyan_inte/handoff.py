@@ -3,12 +3,11 @@ handoff.py
 ----------
 Manages the human-handoff lifecycle for Smartilee.
 
-When the AI determines a conversation needs a human agent it:
+When the AI determines a conversation needs a human counsellor it:
   1. Inserts a record into `handoff_queue` with status='pending'.
   2. Flips `is_handoff_active = True` on the customer row so AI
      replies are blocked for that customer.
-  3. Prepares an "Escalation Alert" payload (sent to the outbound
-     notifier — currently a stub that can be swapped for Happilee).
+  3. Prepares an "Escalation Alert" payload for the dashboard.
 
 Design note: the `send_outbound_message` call at the bottom is
 deliberately isolated so it can be replaced by a single-line change
@@ -135,11 +134,11 @@ def _send_escalation_alert(
     """
     alert_text = (
         f"🚨 *ESCALATION ALERT* 🚨\n\n"
-        f"Customer: *{customer_name}* ({phone_number})\n"
+        f"Student: *{customer_name}* ({phone_number})\n"
         f"Reason: {trigger_reason}\n"
         f"Handoff ID: `{handoff_id}`\n"
-        f"Status: PENDING — awaiting human agent\n\n"
-        f"Please respond in the Smartilee dashboard or WhatsApp directly."
+        f"Status: PENDING — awaiting human counsellor\n\n"
+        f"Please respond in the Smartilee Study Abroad dashboard."
     )
 
     # Notify the system owner (phone number pulled from env)
