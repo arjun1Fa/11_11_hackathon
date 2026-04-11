@@ -6,7 +6,7 @@ the consultancy's real knowledge base — never in generic internet knowledge.
 """
 
 import sys
-from langchain.prompts import PromptTemplate
+from langchain_core.prompts import PromptTemplate
 from langchain_openai import ChatOpenAI
 
 
