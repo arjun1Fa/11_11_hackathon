@@ -1,7 +1,0 @@
-flask
-groq
-langchain
-langchain-groq
-langdetect
-supabase
-python-dotenv
