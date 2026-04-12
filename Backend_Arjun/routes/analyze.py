@@ -95,6 +95,16 @@ def analyze():
             student_profile=customer
         )
 
+        # 9. If appointment requested, flag in Supabase for Integration Engineer
+        if action == "appointment" and customer:
+            try:
+                supabase.table("customers").update({
+                    "appointment_requested": True,
+                    "is_handoff_active": True
+                }).eq("id", customer["id"]).execute()
+            except Exception as e:
+                print(f"[WARN] Failed to set appointment flag: {e}", file=sys.stderr)
+
         return jsonify({
             "intent": intent,
             "sentiment": sentiment,

@@ -13,7 +13,7 @@ def generate_reply_endpoint():
     """
     from app import supabase, llm
     from rag import retrieve_context, get_chat_history
-    from reply_generator import generate_reply, onboarding_reply
+    from reply_generator import generate_reply, onboarding_reply, appointment_reply
     from intelligence import extract_profile_data
 
     try:
@@ -23,6 +23,7 @@ def generate_reply_endpoint():
         intent = data.get("intent", "general")
         sentiment = data.get("sentiment", "neutral")
         language = data.get("language", "en")
+        action = data.get("action", "auto_reply")
 
         if not phone_number or not message_text:
             return jsonify({"error": "phone_number and message_text required"}), 400
@@ -70,6 +71,13 @@ def generate_reply_endpoint():
                 message_text=message_text,
                 language=language,
                 student_profile=profile,
+                llm=llm
+            )
+        elif action == "appointment":
+            reply_text = appointment_reply(
+                message_text=message_text,
+                language=language,
+                student_profile=profile or {},
                 llm=llm
             )
         else:

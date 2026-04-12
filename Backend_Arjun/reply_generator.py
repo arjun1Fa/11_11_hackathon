@@ -236,3 +236,51 @@ def onboarding_reply(
     })
 
     return result.content.strip()
+
+
+# ── Appointment Reply ─────────────────────────────────────────────────────────
+
+APPOINTMENT_PROMPT = ChatPromptTemplate.from_messages([
+    ("system", """You are a warm, friendly study abroad counsellor at Smartilee.
+The student has expressed interest in visiting the institute or booking an appointment with a counsellor.
+
+STUDENT PROFILE:
+- Name: {student_name}
+- Preferred country: {preferred_country}
+
+INSTRUCTIONS:
+1. Address the student by their first name.
+2. Enthusiastically confirm that you have received their request.
+3. Tell them warmly that your team will send them a booking link shortly on this chat.
+4. Keep it short, friendly, and conversational — like a WhatsApp message.
+5. Reply in: {language}
+6. Keep it under 50 words.
+
+Your reply:"""),
+    ("human", "{message}")
+])
+
+
+def appointment_reply(
+    message_text: str,
+    language: str,
+    student_profile: dict,
+    llm: ChatOpenAI,
+) -> str:
+    """
+    Generate a warm confirmation message when a student requests an appointment.
+    Triggers the is_handoff_active and appointment_requested flags in Supabase
+    via the calling route — this function only generates the reply text.
+    """
+    if llm is None:
+        raise ValueError("LLM client must be provided to appointment_reply()")
+
+    chain = APPOINTMENT_PROMPT | llm
+    result = chain.invoke({
+        "student_name":      student_profile.get("name", "there") or "there",
+        "preferred_country": student_profile.get("preferred_country", "") or "",
+        "message":           message_text,
+        "language":          language,
+    })
+
+    return result.content.strip()

@@ -12,6 +12,7 @@ ACTION_UPSELL           = "upsell"
 ACTION_HANDOFF          = "handoff"
 ACTION_SCHEDULE_FOLLOWUP = "schedule_followup"
 ACTION_ONBOARDING       = "onboarding"
+ACTION_APPOINTMENT      = "appointment"
 
 
 def decide_action(
@@ -61,7 +62,11 @@ def decide_action(
         if student_profile.get(field) is None:
             return ACTION_ONBOARDING
 
-    # Rule 1 — Unhappy student with a complaint → human handoff immediately
+    # Rule 1 — Student wants to book an appointment → trigger appointment flow
+    if intent == "appointment_request":
+        return ACTION_APPOINTMENT
+
+    # Rule 2 — Unhappy student with a complaint → human handoff immediately
     if sentiment == "negative" and intent == "complaint":
         return ACTION_HANDOFF
 

@@ -42,6 +42,7 @@ INTENT_LABELS = [
     "scholarship_query",
     "complaint",
     "churn_risk",
+    "appointment_request",
     "general",
 ]
 
@@ -54,6 +55,7 @@ Classify the student's WhatsApp message into exactly one of these intent labels:
 - scholarship_query : Asking about DAAD, Eiffel, Holland Scholarship, or other funding
 - complaint         : Student is unhappy — delayed response, incorrect info, pricing concern
 - churn_risk        : Signalling disengagement — "looking at other consultancies", long silence signals
+- appointment_request : Student wants to visit in person, meet a counsellor, or book a slot
 - general           : Casual conversation, greeting, or completely unclassifiable message
 
 EXAMPLES:
@@ -62,6 +64,8 @@ EXAMPLES:
 "I haven't heard back from my counsellor in 2 weeks" -> complaint
 "Thanks, I will think about it" -> churn_risk
 "How does the APS certificate work?" -> visa_question
+"Can I come in and meet someone?" -> appointment_request
+"I want to book an appointment" -> appointment_request
 "Hello" -> general
 
 Additional context (from knowledge base or conversation history):
