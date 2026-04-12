@@ -41,7 +41,7 @@ if LLM_PROVIDER == "groq":
 
 elif LLM_PROVIDER == "ollama":
     llm = ChatOpenAI(
-        model="llama3.1",
+        model="llama3",
         openai_api_key="ollama",
         openai_api_base=OLLAMA_BASE_URL,
         temperature=0.4,
