@@ -69,6 +69,9 @@ def analyze():
             has_active_enquiry = len(enq_resp.data) > 0
 
         # 4. Retrieve context (RAG)
+        # Normalize country to title case to match knowledge base (e.g. 'germany' -> 'Germany')
+        if preferred_country:
+            preferred_country = preferred_country.strip().title()
         context = retrieve_context(message_text, supabase, filter_country=preferred_country)
 
         # 5. Detect Intent

@@ -73,8 +73,11 @@ def generate_reply_endpoint():
                 llm=llm
             )
         else:
-            # 3. Retrieve contextual info
-            rag_context = retrieve_context(message_text, supabase)
+            # 3. Retrieve contextual info — filter by student's preferred country
+            preferred_country = profile.get("preferred_country") if profile else None
+            if preferred_country:
+                preferred_country = preferred_country.strip().title()
+            rag_context = retrieve_context(message_text, supabase, filter_country=preferred_country)
             chat_hist_val = chat_history if 'chat_history' in locals() else (get_chat_history(profile.get("id"), supabase) if profile else "")
 
             # 4. Generate Standard Reply

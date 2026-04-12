@@ -212,6 +212,9 @@ def extract_profile_data(message_text: str, chat_history: str, llm: ChatOpenAI) 
         # Auto-map package_id based on preferred_country
         country = extracted_dict.get("preferred_country")
         if country:
+            # Normalize: 'germany' -> 'Germany', 'FRANCE' -> 'France'
+            country = country.strip().title()
+            extracted_dict["preferred_country"] = country
             country_lower = country.lower()
             pkg_map = {
                 "germany": "pkg_germany_001",
