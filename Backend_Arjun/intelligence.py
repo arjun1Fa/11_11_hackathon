@@ -181,7 +181,7 @@ Extract exactly these fields if they exist:
 - "preferred_country": string
 - "education_level": string (e.g. "Bachelors", "Masters", "High School")
 - "field_of_study": string (e.g. "Computer Science", "Business", "Automotive")
-- "ielts_score": number (If they explicitly say they HAVE NOT taken the IELTS, or say 'No' to a question asking if they took it, extract the number -1.0)
+- "ielts_score": number (If they explicitly say 'No' to having taken the IELTS, extract -1.0. If they just say 'Yes', DO NOT extract anything. Wait for them to give a number.)
 
 Respond with ONLY valid JSON and absolutely no other text.
 """),

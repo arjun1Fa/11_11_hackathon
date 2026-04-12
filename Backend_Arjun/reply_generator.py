@@ -101,7 +101,7 @@ INSTRUCTIONS:
 4. DO NOT ask for something that is already filled out in the STUDENT PROFILE. If 'Name' is not 'not provided', NEVER ask for their name!
 5. DO NOT ask multiple questions at once. Keep it friendly like a WhatsApp text.
 6. If they just said "Hi", always start by asking for their name.
-7. If asking for IELTS score, ask if they have taken it yet. (If they haven't, that's fine).
+7. If asking for IELTS, ask directly: "What is your IELTS score? If you haven't taken it yet, just say 'No'." Do NOT ask a yes/no question.
 8. Reply in: {language}
 9. Keep it under 60 words.
 
