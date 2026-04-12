@@ -1,0 +1,302 @@
+Smartilee
+Frontend / Product Engineer — Study Abroad Edition
+Hackathon 2025 · Final Workflow Guide · v2.0
+Your Role in One Line
+You build the study abroad consultancy's Flutter dashboard — the visual face of Smartilee that judges see,
+tap through, and judge the product on. Your job is to show everything working in real time: live student
+conversations appearing, handoff alerts firing, customer profiles with country preferences and IELTS scores
+visible at a glance, and the 3 study abroad packages displayed clearly.
+SCOPE FOR THIS HACKATHON
+The goal is focused — build the AI-powered WhatsApp layer and show it working through a clean dashboard.
+Happilee handles the WhatsApp infrastructure. The Flask backend handles the intelligence. Your Flutter app
+shows the counsellor what is happening and gives them control. No payment flows, no complex onboarding.
+Just the core dashboard working cleanly — with study abroad context throughout (country packages, IELTS
+scores, visa status, scholarship interest).
+TECH STACK YOU OWN
+· Flutter (Dart) — cross-platform UI, target Flutter Web for demo
+· supabase_flutter — Supabase client with real-time subscriptions
+· fl_chart — bar chart for message volume, pie chart for customer categories
+· provider — state management across screens
+· intl — date and time formatting
+· http — calling Flask AI backend for churn re-engagement endpoint
+COMPLETE APP STRUCTURE
+lib/ main.dart screens/ dashboard_screen.dart conversations_screen.dart
+conversation_detail_screen.dart customers_screen.dart customer_profile_screen.dart
+packages_screen.dart <-- NEW: shows 3 country packages handoff_queue_screen.dart
+churn_list_screen.dart widgets/ stat_card.dart intent_badge.dart category_badge.dart
+churn_score_bar.dart customer_card.dart conversation_tile.dart country_package_card.dart <--
+NEW: displays one country package services/ supabase_service.dart models/ customer.dart <--
+UPDATED: new fields conversation.dart enquiry_event.dart <-- RENAMED from cart_event.dart
+package.dart <-- NEW: study abroad package model
+SCREEN BY SCREEN BREAKDOWN
+
+1. DashboardScreen
+Four stat cards in a 2x2 grid:
+· Total Student Messages Today
+· AI Reply Rate (%)
+· Enquiry Conversions Today <-- replaces 'Cart Recoveries'
+· Churn Risk Students
+Below the cards: BarChart (fl_chart) showing message volume by hour for today.
+Below chart: PieChart showing student count by category — Champion (amber), Loyal (indigo), At Risk (deepOrange),
+Lost (red), New (teal), Bargain Hunter (purple).
+Bottom navigation bar: Dashboard / Conversations / Students / Packages / Handoff Queue.
+Data fetched on initState and refreshed every 30 seconds with a Timer.
+2. ConversationsScreen
+ListView of all conversations joined with customer name, ordered by most recent.
+Each tile shows: student name bold, last message truncated to 60 chars, relative timestamp, IntentBadge chip, and
+country flag emoji (DE/FR/NL) based on preferred_country.
+Real-time Supabase subscription on conversations — new rows prepend to top with 1.5s highlight animation.
+Tap navigates to ConversationDetailScreen. Empty state view when no conversations.
+3. ConversationDetailScreen
+WhatsApp-style chat bubbles. Inbound messages are grey bubbles left-aligned. Outbound messages are indigo bubbles
+right-aligned.
+Under each outbound bubble: small italic grey caption showing intent_label, action_taken, and package_context (e.g.
+'package_enquiry · auto_reply · Germany').
+Auto-scroll to bottom on load and on new message.
+AppBar shows student name, country flag, and an Escalate to Counsellor button — tapping inserts into handoff_queue
+and sets is_handoff_active=true.
+4. CustomersScreen
+Search bar at top. Below it a horizontal row of filter chips — All, Champion, Loyal, At Risk, Lost, New — each in its
+category colour.
+Second row of filter chips by country: All Countries, Germany, France, Netherlands — filters by preferred_country.
+Main content: ListView of CustomerCard widgets showing name, phone, CategoryBadge, ChurnScoreBar,
+preferred_country with flag, and last active timestamp.
+Tap navigates to CustomerProfileScreen.
+
+5. CustomerProfileScreen
+Four sections:
+SECTION 1 — Identity Card: name, phone, language, tone preference, CategoryBadge.
+SECTION 2 — Study Abroad Profile (NEW — replaces generic purchase info):
+· Preferred country with flag · Interested package name
+· Education level · Field of study · IELTS score
+· Budget range · Churn score bar + risk badge
+SECTION 3 — Enquiry History (replaces cart contents):
+Active or abandoned enquiry_events for this student. If an active enquiry exists, show country, package_id, status, and
+date. 'No active enquiry' empty state otherwise.
+SECTION 4 — Conversation History: last 10 conversations as simple tiles with intent + package_context caption.
+AppBar: student name + Escalate to Counsellor button.
+6. PackagesScreen
+NEW SCREEN — shows all 3 study abroad packages from the packages Supabase table.
+Three CountryPackageCard widgets, one per country (Germany, France, Netherlands).
+Each card shows:
+· Country name + flag emoji · Package name
+· Tuition fee range · Living cost range
+· Duration · Intake months
+· Top 3 universities listed · Scholarships available
+· Eligible students count (query: COUNT from customers WHERE preferred_country=X)
+Data fetched from packages table via get_all_packages() Supabase query.
+This screen is the sales tool — counsellors can quickly pull it up during a WhatsApp handoff call.
+7. HandoffQueueScreen
+All handoff_queue rows where status=pending, ordered by created_at desc, joined with customer name, phone, and
+preferred_country.
+Each card shows: name bold, phone, country interest, reason, time since escalation.
+Green Resolve button — updates status to resolved, resolved_at=now(), sets is_handoff_active=false, animates card
+out.
+Real-time Supabase subscription on handoff_queue — new pending rows trigger SnackBar alert: 'New escalation:
+[name] — [country]'.
+8. ChurnRiskScreen
+All customers where churn_score > 0.7, ordered by score descending.
+Cards show name, phone, CategoryBadge, ChurnScoreBar, preferred_country with flag, days inactive.
+Send Re-engagement button — calls Flask /generate-reply with intent='churn_risk' and shows SnackBar:
+'Re-engagement sent to [name] about [country]'.
+No structural changes from original — only the country flag and preferred_country display are new.
+
+MODEL CHANGES — WHAT'S UPDATED IN DART
+Customer model — new fields:
+class Customer { final String id, phoneNumber, name, language, tonePreference; final String?
+preferredCountry; // NEW — 'Germany'|'France'|'Netherlands' final String? interestedPackageId;
+// NEW — e.g. 'pkg_germany_001' final String? educationLevel; // NEW —
+'Masters'|'Bachelors'|'MBA' final String? fieldOfStudy; // NEW — e.g. 'Computer Science' final
+double? ieltsScore; // NEW — e.g. 6.5 final String? budgetRange; // NEW — e.g. 'Low (0-5k EUR)'
+final DateTime lastActive; final double churnScore; final bool isHandoffActive; final String
+category; }
+New Package model:
+class StudyAbroadPackage { final String id, country, packageName, overview; final String
+tuitionFee, livingCost, duration; final List universities, servicesIncluded, intakeMonths;
+final String eligibility, visaSupport, scholarships; }
+EnquiryEvent model (replaces CartEvent):
+class EnquiryEvent { final String id, customerId, packageId, country, status; final String?
+notes; final DateTime createdAt, updatedAt; }
+Conversation model — new field:
+class Conversation { // ... existing fields ... final String? packageContext; // NEW — which
+country was being discussed }
+BADGE & CHIP COLOURS
+Intent Badge colours:
+package_enquiry=green · visa_question=blue · scholarship_query=purple · complaint=red · churn_risk=orange ·
+general=grey
+Category Badge colours:
+Champion=amber · Loyal=indigo · At Risk=deepOrange · Lost=red.shade900 · New=teal
+Country Flag display:
+Germany=DE flag emoji · France=FR flag emoji · Netherlands=NL flag emoji · null='Not selected'
+DEMO FLOW — 3 MINUTES
+Step 1
+Open Dashboard
+Show stat cards, bar chart, and category pie chart. Mention 'Enquiry Conversions' replacing cart recoveries.
+Step 2
+Open Packages screen
+Show all 3 country package cards — Germany, France, Netherlands — with tuition ranges, universities, and
+scholarship info. This is the 'wow, it knows everything' moment.
+Step 3
+Open Students, tap At Risk filter
+Priya appears with Germany flag and 80% churn bar. Tap Champion — Arjun appears with France flag.
+Step 4
+Tap Priya — open her profile
+Show Study Abroad Profile section: preferred country Germany, Masters in Computer Science, IELTS 6.5,
+abandoned enquiry visible.
+
+Step 5
+Send real WhatsApp message from a phone
+Send: 'Hi what is the blocked account requirement for Germany?' in Malayalam.
+Step 6
+Switch to Conversations
+Message appears live with intent badge 'visa_question' and country label 'Germany'.
+Step 7
+AI reply arrives on the phone
+Malayalam reply with Priya's name and accurate blocked account amount from the knowledge base.
+Step 8
+Send a complaint message
+Handoff Queue shows escalation with SnackBar alert: 'New escalation: Priya — Germany'.
+MASTER PROMPTS — INPUT INTO AI ONE BY ONE
+PROMPT 1 — Flutter Setup + Models (Study Abroad)
+I am building a Flutter dashboard for a WhatsApp AI platform called Smartilee, used by a study abroad consultancy.
+Business counsellor dashboard: live student conversations, study abroad package info, customer intelligence, handoff
+queue. Backend: Supabase + Flask AI backend. Set up the complete Flutter project: 1. Folder structure: screens/,
+widgets/, services/, models/ under lib/. 2. pubspec.yaml: supabase_flutter: ^2.0.0, fl_chart: ^0.68.0, provider: ^6.1.0, intl:
+^0.19.0, http: ^1.2.0. 3. main.dart: await Supabase.initialize(url, anonKey), MaterialApp, dark/light theme, home:
+DashboardScreen. 4. services/supabase_service.dart: SupabaseService singleton. 5. Models with fromJson
+constructors: Customer: id, phoneNumber, name, language, tonePreference, preferredCountry, interestedPackageId,
+educationLevel, fieldOfStudy, ieltsScore (double), budgetRange, lastActive (DateTime), churnScore (double),
+isHandoffActive (bool), category. StudyAbroadPackage: id, country, packageName, overview, tuitionFee, livingCost,
+duration, universities (List), servicesIncluded (List), intakeMonths (List), eligibility, visaSupport, scholarships.
+Conversation: id, customerId, direction, messageText, intentLabel, sentiment, actionTaken, timestamp (DateTime),
+language, packageContext. EnquiryEvent: id, customerId, packageId, country, status, notes, createdAt (DateTime),
+updatedAt (DateTime). Show all files in full.
+PROMPT 2 — Dashboard + Conversations (Study Abroad)
+In my Smartilee Flutter app for a study abroad consultancy, build DashboardScreen and ConversationsScreen.
+DashboardScreen: 1. AppBar: 'Smartilee' bold + 'Study Abroad Dashboard' subtitle. 2. Four StatCards in 2x2 GridView:
+Total Student Messages Today, AI Reply Rate (%), Enquiry Conversions Today, Churn Risk Students. 3. BarChart
+(fl_chart): messages by hour (x=0-23, y=count). Data: conversations grouped by hour(timestamp) for today. 4. PieChart:
+student count by category. Colours: Champion=amber, Loyal=indigo, AtRisk=deepOrange, Lost=red.shade900,
+New=teal. 5. Bottom nav: Dashboard, Conversations, Students, Packages, Handoff Queue. 6. initState fetch + 30s
+Timer refresh + CircularProgressIndicator. ConversationsScreen: 1. Fetch conversations JOIN customers ORDER BY
+timestamp DESC. 2. ListView: name bold, country flag emoji (preferredCountry), 60-char preview, relative timestamp,
+IntentBadge. IntentBadge colours: package_enquiry=green, visa_question=blue, scholarship_query=purple,
+complaint=red, churn_risk=orange, general=grey. 3. Supabase real-time: prepend new rows + 1.5s highlight animation.
+4. Tap -> ConversationDetailScreen(customer_id). 5. Empty state. Build StatCard in widgets/stat_card.dart. Build
+IntentBadge in widgets/intent_badge.dart.
+
+PROMPT 3 — Packages Screen + Customers Screen (Study Abroad)
+In my Smartilee Flutter app for a study abroad consultancy, build PackagesScreen and CustomersScreen.
+PackagesScreen: 1. AppBar: 'Study Abroad Packages'. 2. Fetch all rows from packages Supabase table. 3. ListView of
+CountryPackageCard widgets (one per country). Each card shows: country name + flag emoji, package_name,
+tuition_fee range, living_cost range, duration, top 3 universities listed, intake_months, scholarships, and eligible
+students count (COUNT from customers WHERE preferred_country=country). 4. Cards are colour-coded:
+Germany=purple accent, France=teal accent, Netherlands=blue accent. CustomersScreen: 1. AppBar: 'Students'. 2.
+Search bar: filters list locally by name or phone as user types. 3. Horizontal filter chips (row 1): All, Champion, Loyal, At
+Risk, Lost, New — filters by category. 4. Horizontal filter chips (row 2): All Countries, Germany, France, Netherlands —
+filters by preferred_country. 5. ListView of CustomerCard: name bold + phone grey, CategoryBadge, ChurnScoreBar,
+country flag + preferred_country text, 'Active X days ago'. Tap -> CustomerProfileScreen(customer_id). Build
+CountryPackageCard in widgets/country_package_card.dart. Build CategoryBadge in widgets/category_badge.dart.
+PROMPT 4 — Customer Profile + Conversation Detail (Study Abroad)
+In my Smartilee Flutter app for a study abroad consultancy, build CustomerProfileScreen and
+ConversationDetailScreen. CustomerProfileScreen (takes customer_id): SECTION 1 — Identity Card: name, phone,
+language, tone preference, CategoryBadge at top right. SECTION 2 — Study Abroad Profile (NEW): Preferred country
+(with flag emoji), interested package name (fetched from packages table by interestedPackageId), education level, field
+of study, IELTS score, budget range, ChurnScoreBar + risk level badge (high=red, medium=orange, low=green), days
+since last_active. SECTION 3 — Enquiry History (replaces cart section): Fetch enquiry_events WHERE customer_id=X
+ORDER BY created_at DESC LIMIT 3. Show country, package_id, status badge, created_at date. 'No active enquiry'
+empty state. SECTION 4 — Conversation History: last 10 conversations as tiles with intent_label + package_context
+caption. AppBar: customer name + country flag + Escalate to Counsellor button (INSERT handoff_queue with
+package_discussed=preferredCountry + UPDATE is_handoff_active=true + SnackBar). ConversationDetailScreen
+(takes customer_id): Fetch all conversations for customer, order by timestamp ASC. Inbound: grey bubble left.
+Outbound: indigo bubble right. Under outbound bubble: italic grey caption = intent_label + ' · ' + action_taken + ' · ' +
+packageContext. Auto-scroll to bottom on load + on new message. AppBar: name + country flag + Escalate button.
+Show both screens in full.
+PROMPT 5 — Handoff Queue + Churn Risk (Study Abroad)
+In my Smartilee Flutter app for a study abroad consultancy, build HandoffQueueScreen and ChurnRiskScreen.
+HandoffQueueScreen: 1. Fetch handoff_queue WHERE status='pending' ORDER BY created_at DESC. Join
+customers for name, phone, preferred_country. 2. ListView of cards: name bold, phone, country interest (flag + name),
+package_discussed, reason, time since escalation. Green Resolve ElevatedButton. 3. Resolve tap: UPDATE
+handoff_queue SET status='resolved', resolved_at=now(). UPDATE customers SET is_handoff_active=false. Animated
+dismiss of card. 4. Supabase real-time on handoff_queue: new pending row -> add to top + SnackBar: 'New escalation:
+[name] — [country]'. ChurnRiskScreen: 1. Fetch customers WHERE churn_score > 0.7 ORDER BY churn_score DESC.
+2. Cards: name, phone, CategoryBadge, ChurnScoreBar, country flag + preferred_country, 'Inactive N days'. Send
+Re-engagement OutlinedButton. On tap: POST to Flask /generate-reply { intent:'churn_risk', language, phone_number
+}. Show SnackBar: 'Re-engagement sent to [name] about [preferredCountry]'. Show both screens in full.
+SMARTILEE — COMPLETE HACKATHON TIMELINE (6 HOURS)
+
+Hour 1
+Foundation — DB deploys first, everyone scaffolds
+DB Engineer: Create Supabase project, run full SQL migration (all 8 tables including packages +
+knowledge_base), enable real-time on enquiry_events + handoff_queue, seed demo data (3 packages, 3
+customers, knowledge base rows), share SUPABASE_URL + SUPABASE_KEY with team. AI Engineer: Set
+up Flask project, install all dependencies, sign up on console.groq.com, get free API key, test basic Groq
+call, set up Ollama locally as backup, confirm /health endpoint returns {status: ok}. Integration: Set up
+Node.js + Express project, install dependencies, install ngrok, register on happilee.io, get sandbox number,
+configure Happilee webhook to ngrok URL, send test WhatsApp message and confirm it hits Express server.
+Frontend: Create Flutter project, add all pubspec.yaml dependencies, initialise Supabase in main.dart,
+create all model classes (Customer, Conversation, EnquiryEvent, Package), build SupabaseService
+singleton, build basic navigation shell.
+Hour 2
+Core intelligence + Core UI
+DB Engineer: Write and share all query functions (Python + JS versions): upsert_customer,
+get_customer_profile, log_conversation, get_conversations, get_dashboard_stats, get_all_packages.
+Embed knowledge base rows into pgvector. Stay on standby. AI Engineer: Build intelligence.py:
+detect_language, detect_intent, detect_sentiment using LangChain + Groq LLaMA 3. Build RAG layer:
+load_knowledge_base(), retrieve_context() using pgvector similarity search. Test intent detection with
+sample student messages. Integration: Build POST /webhook endpoint, parse Happilee payload, call mock
+/analyze returning hardcoded auto_reply, build sendMessage() and sendTemplate() outbound functions, test
+WhatsApp message in -> hardcoded reply sent back. Log inbound messages to Supabase. Frontend: Build
+DashboardScreen: 4 StatCards + bar chart (fl_chart), connect to Supabase with real queries, 30s refresh
+Timer. Build ConversationsScreen: ListView with IntentBadge widgets, Supabase real-time subscription,
+highlight animation.
+Hour 3
+Complete AI backend + Connect integration
+AI Engineer: Build decision_engine.py with all 4 routing rules. Build POST /analyze endpoint (full pipeline):
+detect_language -> retrieve_context (RAG) -> detect_intent -> detect_sentiment -> compute_churn_score ->
+decide_action. Test /analyze with Postman using demo student data. Target: /analyze fully working by end of
+Hour 3. Integration: Replace mock /analyze with real Flask /analyze call. Build full routing logic for all 4
+actions: auto_reply, upsell, handoff, schedule_followup. Log every inbound + outbound message to
+Supabase. Test full flow: real WhatsApp -> AI analyzes -> reply sent. Frontend: Build
+ConversationDetailScreen: WhatsApp-style chat bubbles, auto-scroll, intent caption under each AI bubble.
+Build CustomersScreen: full list with CategoryBadge, ChurnScoreBar, search bar, category filter chips. DB
+Engineer: Verify seed data is clean, fix any schema issues, help other engineers with Supabase query
+debugging.
+Hour 4
+All features complete
+AI Engineer: Build reply_generator.py: generate_reply() + upsell_reply() with full RAG-injected personalised
+prompts. Build churn_scorer.py: compute_churn_score() using enquiry_events instead of cart_events. Build
+POST /generate-reply, POST /upsell, POST /churn-score. All 5 Flask endpoints working and tested end to
+end. Integration: Build handoff.js: full handoff flow — insert handoff_queue, set is_handoff_active=true, notify
+owner on WhatsApp. Build triggers.js: enquiry abandonment real-time listener (30 min), inactivity cron job
+(node-cron 21:00 nightly). Register package_followup + reengagement templates in Happilee. Frontend:
+Build CustomerProfileScreen: 4 sections (identity with country/package/IELTS, intelligence summary,
+enquiry history, conversation history). Build HandoffQueueScreen: pending cards, Resolve button, real-time
+Supabase subscription + SnackBar alert. Build ChurnRiskScreen: high risk list, re-engagement button. DB
+Engineer: Write get_customer_enquiry_history() and get_customer_behaviour_summary() query functions.
+Share with Frontend engineer.
+
+Hour 5
+RAG tuning + Automation + Polish
+AI Engineer: Test RAG with real study abroad questions (fees, visa, scholarships). Tune retrieval — pass
+filter_country when student specifies Germany/France/Netherlands. Test multilingual replies (Malayalam,
+Hindi, Tamil, English). Verify all prompt outputs sound natural. Confirm Groq free tier quota is sufficient.
+Switch Ollama local as fallback. Integration: Shorten enquiry abandonment timeout to 2 mins for demo. Full
+end-to-end test: WhatsApp -> AI -> reply -> enquiry recovery -> handoff -> owner notified. Confirm ngrok is
+stable or deploy to Railway. Frontend: Connect all remaining mock data to live Supabase queries. Add
+loading indicators and empty states to every screen. Polish UI: colours, spacing, typography consistency.
+Rehearse 3-minute demo script twice. DB Engineer: Reset demo data to clean starting state. Re-run seed
+script, restore all customer records and knowledge base. Keep seed script ready to run again before
+presentation.
+Hour 6
+Full integration test + Demo prep
+ALL ENGINEERS: Run complete end-to-end demo scenario together. Fix any bugs that surface during full
+test. Verify real-time updates work across all Flutter screens. Verify multilingual reply works (send
+Malayalam, get Malayalam). Verify enquiry recovery fires correctly (2-min demo timeout). Verify handoff
+queue updates live in Flutter dashboard. DB Engineer: Final seed data reset. Keep laptop open with
+Supabase dashboard. AI Engineer: Confirm Flask server is stable. Check Groq quota. Keep Ollama running
+as hot standby. Integration: Final WhatsApp send test 10 mins before presentation. Confirm Happilee
+webhook is live and pointing correctly. Frontend: Final Flutter Web build. Run demo script one more time.
+Record a screen capture as backup for connectivity failures.
+ Smartilee · Frontend / Product Engineer · Study Abroad Edition · Hackathon 2025 · v2.0
+ 

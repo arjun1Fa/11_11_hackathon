@@ -1,0 +1,225 @@
+Smartilee
+Integration Engineer — Study Abroad Edition
+Hackathon 2025 · Final Workflow Guide · v2.0
+Your Role in One Line
+You are the nervous system of Smartilee. You connect WhatsApp to the AI brain via Happilee webhooks,
+route every incoming student message to the right action, fire automated enquiry recovery and
+re-engagement flows, and manage the human handoff process. You are the coordinator between Happilee,
+the Flask AI backend, and Supabase.
+HOW WHATSAPP INTEGRATION WORKS — HAPPILEE
+Happilee is not a chatbot builder for Smartilee. We use Happilee only as a pipe — it gives us access to the
+WhatsApp Business API. Here is the exact flow:
+Step 1
+Register your business WhatsApp number at happilee.io
+Free sandbox available. This gives you a test number to send and receive WhatsApp messages.
+Step 2
+Give Happilee your Node.js server's public URL
+Happilee will POST every incoming message to your webhook endpoint. Local testing: run ngrok http 3000
+and give Happilee the ngrok HTTPS URL.
+Step 3
+Student sends a WhatsApp message
+Happilee receives it and immediately forwards a JSON payload to your webhook endpoint.
+Step 4
+Your Node.js server processes the message
+Calls the Flask AI backend, gets a reply decision, generates the reply, and sends it back through Happilee's
+outbound REST API.
+Step 5
+Template messages for proactive outreach
+For messages sent outside the 24-hour window (enquiry recovery, re-engagement), WhatsApp requires
+pre-approved message templates. Register these in Happilee.
+HAPPILEE WEBHOOK PAYLOAD
+{ "from": "+919876543210", "message": { "text": "Hi what is the fee for Germany?" },
+"timestamp": 1718000000 } Extract: phone_number = payload.from, message_text =
+payload.message.text
+Happilee Outbound API
+POST https://api.happilee.io/v1/send Headers: { Authorization: Bearer YOUR_HAPPILEE_TOKEN,
+Content-Type: application/json } Body (text message): { to, type: "text", text: { body: "..." }
+} Body (template — for enquiry recovery / re-engagement): { to, type: "template", template: {
+name: "package_followup", params: ["Priya", "Germany"] } }
+MESSAGE ROUTING LOGIC
+After calling POST /analyze on the AI backend and receiving the action field:
+
+· auto_reply → call /generate-reply, get reply_text, send via Happilee sendMessage()
+· upsell → call /upsell, get upsell_message, send via Happilee sendMessage()
+· handoff → handleHandoff(phone_number, reason) — insert to handoff_queue, notify owner, stop AI replies
+· schedule_followup → insert row into followups table, cron job will send it later
+TECH STACK YOU OWN
+· Node.js + Express — your server framework
+· axios — HTTP calls to Flask AI backend
+· @supabase/supabase-js — reading/writing Supabase data
+· node-cron — scheduled inactivity re-engagement job
+· Happilee REST API — outbound WhatsApp messaging
+· ngrok — local tunnel for webhook testing during development
+FEATURES YOU BUILD
+POST /webhook
+Receive and parse all incoming Happilee messages
+Message routing
+Call /analyze, act on returned action (auto_reply/upsell/handoff/schedule_followup)
+sendMessage()
+Outbound text reply via Happilee REST API
+sendTemplate()
+Outbound template message (enquiry recovery, re-engagement)
+Enquiry abandonment
+trigger
+Supabase real-time listener on enquiry_events + 30-min setTimeout (2 min for demo)
+Inactivity cron
+node-cron 21:00 daily — re-engages students inactive for 7+ days
+Human handoff
+Insert handoff_queue, notify owner on WhatsApp, block AI replies for that thread
+Conversation logging
+Every inbound and outbound message logged to Supabase conversations table with
+package_context field
+KEY SCHEMA CHANGE — ENQUIRY_EVENTS REPLACES CART_EVENTS
+The only structural change from the original Smartilee schema that affects your code is the rename of
+cart_events to enquiry_events. The table structure and logic are identical. Update all references in your
+code:
+// OLD (e-commerce): supabase.channel('cart-events').on('postgres_changes', { table:
+'cart_events', filter: 'status=eq.abandoned' }, handleAbandon) // NEW (study abroad):
+supabase.channel('enquiry-events').on('postgres_changes', { table: 'enquiry_events', filter:
+'status=eq.abandoned' }, handleEnquiryAbandon) // handleEnquiryAbandon sends a package
+follow-up instead of a cart recovery message: sendTemplate(phone, 'package_followup',
+[customer.name, customer.preferred_country]) // UPDATE enquiry_events SET
+status='followup_sent', updated_at=now()
+Also update the outbound Supabase log call to include the new package_context field when logging
+conversations:
+
+// Log inbound/outbound — add package_context from /analyze response: await
+supabase.from('conversations').insert({ customer_id, direction, message_text, intent_label:
+analyzeResult.intent, sentiment: analyzeResult.sentiment, action_taken: analyzeResult.action,
+language: analyzeResult.language, package_context: analyzeResult.preferred_country // NEW FIELD
+})
+MASTER PROMPTS — INPUT INTO AI ONE BY ONE
+PROMPT 1 — Project Setup
+I am building the integration layer for a WhatsApp AI platform called Smartilee, used by a study abroad consultancy.
+Stack: Node.js + Express, axios for HTTP calls to Python Flask AI backend, @supabase/supabase-js, node-cron,
+dotenv. Create: 1. Project folder structure: smartilee-integration/ server.js (Express entry point), webhook.js (Webhook
+handler), messaging.js (Happilee outbound functions), triggers.js (Enquiry + inactivity automation), handoff.js (Human
+handoff logic), supabaseClient.js (Supabase initialisation), .env.example, package.json. 2. package.json dependencies:
+express, axios, @supabase/supabase-js, node-cron, dotenv. 3. .env.example: HAPPILEE_TOKEN=,
+SUPABASE_URL=, SUPABASE_KEY=, AI_BACKEND_URL=http://localhost:5000, PORT=3000,
+OWNER_PHONE=+91... 4. server.js: Express, dotenv.config(), use(express.json()), GET /health returning {status: ok},
+listen on PORT. 5. supabaseClient.js: initialise and export Supabase JS client. Show all files in full.
+PROMPT 2 — Webhook + Full Routing (Study Abroad)
+In my Smartilee Node.js server for a study abroad consultancy, build webhook.js and add route to server.js. POST
+/webhook must: 1. Parse Happilee payload: { from, message: { text }, timestamp }. phone_number = from,
+message_text = message.text. 2. Respond HTTP 200 immediately. Process everything async after. 3. Async
+processing: a. Fetch customer from Supabase by phone_number. If customer.is_handoff_active === true: log message
+to conversations with action_taken='human_active'. STOP. b. Log inbound to conversations: { customer_id,
+direction:'inbound', message_text, timestamp }. c. Call POST {AI_BACKEND_URL}/analyze with { phone_number,
+message_text }. Get back: { intent, sentiment, language, action, churn_score, preferred_country }. d. Update
+conversation row: intent_label, sentiment, action_taken, package_context=preferred_country. e. Route on action:
+'auto_reply' -> call POST /generate-reply, get reply_text. 'upsell' -> call POST /upsell, get upsell_message as reply_text.
+'handoff' -> call handleHandoff(phone_number, 'ai_escalation'). 'schedule_followup' -> INSERT into followups with
+package_id from customer profile, skip outbound. f. For auto_reply/upsell: sendMessage(phone_number, reply_text).
+Log outbound to conversations. try/catch at every step. console.error on failures.
+PROMPT 3 — Outbound Messaging
+In my Smartilee Node.js server, build messaging.js. 1. async sendMessage(to, text): POST
+https://api.happilee.io/v1/send, Headers: Authorization Bearer + Content-Type application/json, Body: { to, type:'text',
+text:{ body: text } }. On success: log '[SENT] to {to}: {text.substring(0,60)}'. On error: log error + Happilee response.
+Never throw. 2. async sendTemplate(to, template_name, params_array): Body: { to, type:'template', template:{ name:
+template_name, language:{ code:'en' }, components:[{ type:'body', parameters:
+params_array.map(p=>({type:'text',text:p})) }] } }. Templates to register in Happilee: 'package_followup' (params:
+[student_name, country]), 'reengagement' (params: [student_name]). Export both. Show integration into webhook
+routing.
+
+PROMPT 4 — Enquiry Abandonment + Inactivity Cron (Study Abroad)
+In my Smartilee Node.js server for a study abroad consultancy, build triggers.js. SYSTEM 1 — Enquiry abandonment
+(Supabase real-time): supabase.channel('enquiry-events').on('postgres_changes', { event:'INSERT', schema:'public',
+table:'enquiry_events', filter:'status=eq.abandoned' }, handleEnquiryAbandon).subscribe().
+handleEnquiryAbandon(payload): Extract customer_id from payload.new. Fetch customer phone + name +
+preferred_country from Supabase. setTimeout(30 * 60 * 1000, async () => { Call POST /generate-reply {
+phone_number, intent:'package_enquiry', message_text:'enquiry_reminder', language: customer.language }.
+sendTemplate(phone, 'package_followup', [customer.name, customer.preferred_country]). UPDATE enquiry_events
+SET status='followup_sent', updated_at=now(). Log to conversations table with
+package_context=customer.preferred_country }). SYSTEM 2 — Inactivity cron: cron.schedule('0 21 * * *', async () => {
+Query: SELECT * FROM customers WHERE last_active < now() - interval '7 days' AND is_handoff_active = false. For
+each customer: Call POST /generate-reply { intent:'churn_risk', language }. sendTemplate(phone, 'reengagement',
+[name]). Log to conversations. await delay(200ms) to avoid rate limits }). Export setup functions. Call both from server.js
+on startup.
+PROMPT 5 — Human Handoff
+In my Smartilee Node.js server, build handoff.js. async function handleHandoff(phone_number, reason): 1. Fetch
+customer by phone_number from Supabase (include preferred_country and interested_package_id). 2. INSERT into
+handoff_queue: { customer_id, reason, package_discussed: customer.preferred_country, status:'pending', created_at:
+now }. 3. UPDATE customers SET is_handoff_active = true. 4. sendMessage(OWNER_PHONE, 'Smartilee Alert:
+Student {name} ({phone}) needs attention. Country interest: {preferred_country}. Package: {interested_package_id}.
+Reason: {reason}.'). 5. sendMessage(phone_number, 'Your query has been escalated to our study abroad counsellor.
+We will be in touch shortly.'). In webhook.js, at the very START of async processing: if (customer.is_handoff_active ===
+true) { log message with action_taken = 'human_active'; return }. Show complete handoff.js and the modified webhook
+check. Include try/catch and console.log at each step.
+SMARTILEE — COMPLETE HACKATHON TIMELINE (6 HOURS)
+Hour 1
+Foundation — DB deploys first, everyone scaffolds
+DB Engineer: Create Supabase project, run full SQL migration (all 8 tables including packages +
+knowledge_base), enable real-time on enquiry_events + handoff_queue, seed demo data (3 packages, 3
+customers, knowledge base rows), share SUPABASE_URL + SUPABASE_KEY with team. AI Engineer: Set
+up Flask project, install all dependencies, sign up on console.groq.com, get free API key, test basic Groq
+call, set up Ollama locally as backup, confirm /health endpoint returns {status: ok}. Integration: Set up
+Node.js + Express project, install dependencies, install ngrok, register on happilee.io, get sandbox number,
+configure Happilee webhook to ngrok URL, send test WhatsApp message and confirm it hits Express server.
+Frontend: Create Flutter project, add all pubspec.yaml dependencies, initialise Supabase in main.dart,
+create all model classes (Customer, Conversation, EnquiryEvent, Package), build SupabaseService
+singleton, build basic navigation shell.
+
+Hour 2
+Core intelligence + Core UI
+DB Engineer: Write and share all query functions (Python + JS versions): upsert_customer,
+get_customer_profile, log_conversation, get_conversations, get_dashboard_stats, get_all_packages.
+Embed knowledge base rows into pgvector. Stay on standby. AI Engineer: Build intelligence.py:
+detect_language, detect_intent, detect_sentiment using LangChain + Groq LLaMA 3. Build RAG layer:
+load_knowledge_base(), retrieve_context() using pgvector similarity search. Test intent detection with
+sample student messages. Integration: Build POST /webhook endpoint, parse Happilee payload, call mock
+/analyze returning hardcoded auto_reply, build sendMessage() and sendTemplate() outbound functions, test
+WhatsApp message in -> hardcoded reply sent back. Log inbound messages to Supabase. Frontend: Build
+DashboardScreen: 4 StatCards + bar chart (fl_chart), connect to Supabase with real queries, 30s refresh
+Timer. Build ConversationsScreen: ListView with IntentBadge widgets, Supabase real-time subscription,
+highlight animation.
+Hour 3
+Complete AI backend + Connect integration
+AI Engineer: Build decision_engine.py with all 4 routing rules. Build POST /analyze endpoint (full pipeline):
+detect_language -> retrieve_context (RAG) -> detect_intent -> detect_sentiment -> compute_churn_score ->
+decide_action. Test /analyze with Postman using demo student data. Target: /analyze fully working by end of
+Hour 3. Integration: Replace mock /analyze with real Flask /analyze call. Build full routing logic for all 4
+actions: auto_reply, upsell, handoff, schedule_followup. Log every inbound + outbound message to
+Supabase. Test full flow: real WhatsApp -> AI analyzes -> reply sent. Frontend: Build
+ConversationDetailScreen: WhatsApp-style chat bubbles, auto-scroll, intent caption under each AI bubble.
+Build CustomersScreen: full list with CategoryBadge, ChurnScoreBar, search bar, category filter chips. DB
+Engineer: Verify seed data is clean, fix any schema issues, help other engineers with Supabase query
+debugging.
+Hour 4
+All features complete
+AI Engineer: Build reply_generator.py: generate_reply() + upsell_reply() with full RAG-injected personalised
+prompts. Build churn_scorer.py: compute_churn_score() using enquiry_events instead of cart_events. Build
+POST /generate-reply, POST /upsell, POST /churn-score. All 5 Flask endpoints working and tested end to
+end. Integration: Build handoff.js: full handoff flow — insert handoff_queue, set is_handoff_active=true, notify
+owner on WhatsApp. Build triggers.js: enquiry abandonment real-time listener (30 min), inactivity cron job
+(node-cron 21:00 nightly). Register package_followup + reengagement templates in Happilee. Frontend:
+Build CustomerProfileScreen: 4 sections (identity with country/package/IELTS, intelligence summary,
+enquiry history, conversation history). Build HandoffQueueScreen: pending cards, Resolve button, real-time
+Supabase subscription + SnackBar alert. Build ChurnRiskScreen: high risk list, re-engagement button. DB
+Engineer: Write get_customer_enquiry_history() and get_customer_behaviour_summary() query functions.
+Share with Frontend engineer.
+Hour 5
+RAG tuning + Automation + Polish
+AI Engineer: Test RAG with real study abroad questions (fees, visa, scholarships). Tune retrieval — pass
+filter_country when student specifies Germany/France/Netherlands. Test multilingual replies (Malayalam,
+Hindi, Tamil, English). Verify all prompt outputs sound natural. Confirm Groq free tier quota is sufficient.
+Switch Ollama local as fallback. Integration: Shorten enquiry abandonment timeout to 2 mins for demo. Full
+end-to-end test: WhatsApp -> AI -> reply -> enquiry recovery -> handoff -> owner notified. Confirm ngrok is
+stable or deploy to Railway. Frontend: Connect all remaining mock data to live Supabase queries. Add
+loading indicators and empty states to every screen. Polish UI: colours, spacing, typography consistency.
+Rehearse 3-minute demo script twice. DB Engineer: Reset demo data to clean starting state. Re-run seed
+script, restore all customer records and knowledge base. Keep seed script ready to run again before
+presentation.
+
+Hour 6
+Full integration test + Demo prep
+ALL ENGINEERS: Run complete end-to-end demo scenario together. Fix any bugs that surface during full
+test. Verify real-time updates work across all Flutter screens. Verify multilingual reply works (send
+Malayalam, get Malayalam). Verify enquiry recovery fires correctly (2-min demo timeout). Verify handoff
+queue updates live in Flutter dashboard. DB Engineer: Final seed data reset. Keep laptop open with
+Supabase dashboard. AI Engineer: Confirm Flask server is stable. Check Groq quota. Keep Ollama running
+as hot standby. Integration: Final WhatsApp send test 10 mins before presentation. Confirm Happilee
+webhook is live and pointing correctly. Frontend: Final Flutter Web build. Run demo script one more time.
+Record a screen capture as backup for connectivity failures.
+ Smartilee · Integration Engineer · Study Abroad Edition · Hackathon 2025 · v2.0
+ 

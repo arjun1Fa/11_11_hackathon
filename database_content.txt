@@ -1,0 +1,469 @@
+Smartilee
+Database Engineer — Study Abroad Edition
+Hackathon 2025 · Final Workflow Guide · v2.0
+Your Role in One Line
+You are the memory of Smartilee. Every student profile, consultation conversation, package enquiry, country
+preference, application event, and the entire study abroad knowledge base lives in your Supabase database.
+You are the critical path — nothing works until your tables exist. You also own the RAG knowledge base that
+powers the AI's ability to answer student questions about packages, visa rules, scholarships, tuition, and
+living costs for Germany, France, and the Netherlands.
+THE CORE CONCEPT YOU OWN — KNOWLEDGE BASE + PGVECTOR
+The study abroad consultancy's entire knowledge — country packages, visa rules, scholarship details, tuition
+ranges, living costs, eligibility, intake dates, FAQs — is stored in a knowledge_base table. Each row has a
+content column (plain text) and an embedding column (vector). When a student WhatsApps a question like
+'What is the tuition fee for Germany?' or 'Can I get a scholarship for France?', the AI engineer's RAG pipeline
+converts the question into a vector, finds the most relevant knowledge base rows using cosine similarity
+search, and feeds that context to the LLM before generating a reply. The student gets a precise, accurate
+answer — not generic internet knowledge.
+TECH STACK YOU OWN
+   · Supabase — hosted PostgreSQL with real-time, auth, RLS, and pgvector
+   · pgvector — vector similarity search extension for RAG queries
+   · SQL — all migration scripts, RPC functions, and analytical queries
+   · Supabase Dashboard — table editor, SQL editor, real-time inspector
+   · supabase-py — Python client for the AI engineer
+   · @supabase/supabase-js — JS client for Integration and Frontend engineers
+THE 3 STUDY ABROAD PACKAGES — FULL DETAIL
+These three packages are the heart of the RAG knowledge base. Seed every field below as structured rows
+in the knowledge_base table. Each bullet point = one row. The AI reads from these rows to answer student
+enquiries in real time over WhatsApp.
+DE Germany Public University Starter Package
+Package ID: pkg_germany_001 | Category: Budget-Friendly / Public Universities
+Overview
+Designed for students who want world-class education at near-zero tuition. Germany's public universities charge
+little to no tuition fees. This package provides end-to-end support from university selection through visa approval
+and pre-departure briefing. Ideal for students targeting STEM, engineering, and applied sciences at globally
+ranked institutions.
+Tuition Fee
+0 – 1,500 EUR per year (most public universities charge only a semester admin fee)
+
+Living Cost
+850 – 1,200 EUR per month (rent, food, transport, health insurance)
+Duration
+3–4 years (Bachelor's) / 2 years (Master's)
+Intake Months
+Winter: September / October | Summer: March / April
+Eligibility
+Minimum 70% in previous education, IELTS 6.5+ or equivalent, relevant undergraduate
+degree for PG
+Visa Support
+Full guidance: blocked account setup, APS certificate (for Indian students), embassy
+documentation, appointment preparation
+Scholarships
+DAAD (German Academic Exchange Service) scholarships, Deutschlandstipendium,
+university-specific fee waivers
+Universities Covered
+Technical University of Munich (TUM) · RWTH Aachen University · University of Stuttgart · Heidelberg University
+· Freie Universitat Berlin
+Services Included
++ University shortlisting & comparison
++ Complete application assistance
++ SOP and LOR drafting guidance
++ Blocked account setup support
++ APS certificate guidance (India)
++ Visa documentation review
++ Embassy appointment preparation
++ Pre-departure briefing session
++ Post-arrival checklist & orientation guide
+Services Not Included
+- Flight tickets
+- Health insurance payment
+- Accommodation rent
+- University application fees
+- Language course fees (TestDaF/DSH)
+FAQs — Germany Package
+Q: Is education really free in Germany?
+A: Public universities charge little to no tuition. Students pay only
+a semester contribution (150–350 EUR) covering admin and
+transit pass. Living costs are the main expense.
+Q: What is a blocked account and how much do
+I need?
+A: A blocked account proves you can financially support yourself.
+You must deposit approximately 11,208 EUR (as of 2024). Our
+team guides you through opening it with Deutsche Bank or
+Fintiba.
+Q: Do I need to know German?
+A: Master's programs in English exist widely at TU Munich, RWTH
+Aachen, etc. German language (B1/B2) is required for
+German-taught programs. We advise based on your chosen
+course.
+Q: What is APS verification?
+A: APS (Academic Evaluation Centre) is mandatory for Indian
+students. It verifies your academic certificates. Processing takes
+4–6 weeks. We guide you through the entire process.
+
+Q: Can I work part-time in Germany?
+A: Yes. International students can work up to 120 full days or 240
+half days per year. Minimum wage is 12.41 EUR/hour, which can
+cover a significant portion of living costs.
+FR France Business School Premium Package
+Package ID: pkg_france_001 | Category: Premium / Business & Management
+Overview
+Designed for ambitious students targeting France's elite Grande Ecoles and top-ranked business schools.
+France is home to three of Europe's top 10 business schools. This package provides highly personalised support
+including profile evaluation, GMAT preparation advice, interview coaching, and the Campus France registration
+process. Ideal for students targeting MBA, MSc Finance, MSc Marketing, and MSc Management.
+Tuition Fee
+8,000 – 20,000 EUR per year (varies by school and program)
+Living Cost
+900 – 1,400 EUR per month (Paris higher at 1,200–1,400; Lyon/Lille lower at 900–1,100)
+Duration
+1–2 years (Master's / MBA / MSc programs)
+Intake Months
+September (main intake) | January (some programs)
+Eligibility
+Bachelor's degree in any discipline, IELTS 6.5+, GMAT/GRE recommended for top schools
+(HEC Paris: GMAT 690+ avg), strong extracurriculars
+Visa Support
+Campus France registration, VFS appointment, visa interview preparation, Attestation de
+Bourse for scholarship holders
+Scholarships
+Eiffel Excellence Scholarship (French government, covers tuition + living allowance),
+school-specific merit scholarships, MOPGA grants
+Universities Covered
+HEC Paris · ESSEC Business School · EDHEC Business School · INSEAD (MBA) · Sciences Po Paris · EM Lyon
+Business School
+Services Included
++ Detailed profile evaluation & gap analysis
++ School shortlisting (reach / match / safe)
++ Full application management
++ GMAT/GRE strategy advice
++ Essay & SOP writing support
++ Interview training (mock sessions)
++ Campus France registration help
++ Scholarship application guidance
++ Visa interview preparation
++ Accommodation search guidance
+Services Not Included
+- Campus France registration fee
+- GMAT / GRE exam fees
+- Flight tickets
+- Visa application fee
+- University application fees
+- Health insurance (CVEC contribution)
+
+FAQs — France Package
+Q: Is GMAT mandatory for French business
+schools?
+A: Top schools like HEC Paris and ESSEC strongly prefer GMAT
+(avg 690+). Some programs offer waivers for candidates with
+strong professional experience. We advise you case by case.
+Q: What is Campus France?
+A: Campus France is the French government agency that
+manages study permit applications for most countries. All
+students must register and attend an interview before applying for
+a visa. We guide the entire process.
+Q: Can I work while studying in France?
+A: Yes. International students may work up to 964 hours per year
+(approx 20 hours/week). French minimum wage is 11.65
+EUR/hour. Students in Paris can cover 40–60% of living costs this
+way.
+Q: What is the Eiffel Excellence Scholarship?
+A: A French government scholarship covering tuition, a monthly
+stipend (~1,181 EUR), housing allowance, and travel. Very
+competitive — we help shortlisted students with the application.
+Q: Is French language required?
+A: Most top business school programs (HEC, ESSEC, EDHEC)
+are fully in English. French language proof is not required for
+English-track programs, though basic French helps with daily life.
+NL Netherlands Tech & Innovation Package
+Package ID: pkg_netherlands_001 | Category: Tech & Innovation / English Programs
+Overview
+Designed for students targeting technology, data science, AI, engineering, and innovation management
+programs in the Netherlands. The Dutch education system is internationally oriented — nearly all university
+Master's programs are taught fully in English. Dutch universities have strong ties with global tech companies
+(ASML, Philips, Booking.com, TomTom), offering excellent internship and career placement prospects. Ideal for
+students targeting Computer Science, Data Science, AI, Electrical Engineering, and Industrial Design.
+Tuition Fee
+6,000 – 15,000 EUR per year (statutory fee for EEA students ~2,314 EUR; institutional fee
+for non-EEA 8,000–20,000 EUR)
+Living Cost
+900 – 1,300 EUR per month (Amsterdam/Delft higher; Eindhoven/Groningen lower)
+Duration
+2 years (most Master's programs) | 3 years (some Bachelor's in Dutch)
+Intake Months
+September (primary) | February (limited programs)
+Eligibility
+Bachelor's degree in a relevant field, IELTS 6.5+ (some programs require 7.0+), strong
+academic background, portfolio/motivation letter
+Visa Support
+MVV (Provisional Residence Permit) application, IND residence permit via university
+sponsorship, DigiD registration, BSN number guidance
+
+Scholarships
+Holland Scholarship (5,000 EUR one-time, for non-EEA students), Orange Tulip
+Scholarship, university-specific grants (TU Delft Excellence, UvA Holland)
+Universities Covered
+Delft University of Technology (TU Delft) · University of Amsterdam (UvA) · Eindhoven University of Technology
+(TU/e) · University of Groningen · Vrije Universiteit Amsterdam
+Services Included
++ Course and university matching
++ Full application processing
++ CV, SOP, and motivation letter support
++ Portfolio guidance (design programs)
++ MVV visa application support
++ IND residence permit guidance
++ Holland Scholarship application help
++ Housing search strategy & support
++ BSN and DigiD registration guidance
++ Post-arrival orientation checklist
+Services Not Included
+- Travel expenses
+- Health insurance (mandatory in NL)
+- Accommodation deposit & rent
+- University application fees
+- Personal & miscellaneous expenses
+FAQs — Netherlands Package
+Q: Are all courses in English in the
+Netherlands?
+A: Yes — virtually all university Master's programs are taught fully
+in English. The Netherlands ranks #1 in Europe for English-taught
+programs. No Dutch language requirement for most Master's.
+Q: Is housing difficult to find in the
+Netherlands?
+A: Yes, especially in Amsterdam and Delft. The housing market is
+very competitive. We advise applying through your university's
+housing portal the same day you receive your admission offer.
+Early action is critical.
+Q: What is the Holland Scholarship?
+A: A Dutch government scholarship of 5,000 EUR (one-time) for
+non-EEA students in the first year of a Bachelor's or Master's.
+Awarded by participating universities. We help you apply
+alongside your university application.
+Q: What is an MVV and do I need one?
+A: An MVV (Machtiging tot Voorlopig Verblijf) is a provisional
+residence permit visa required for stays over 90 days. Most
+students get it through university sponsorship via the IND. We
+manage the full process.
+Q: Can I stay and work in the Netherlands after
+graduation?
+A: Yes. The Netherlands offers an Orientation Year permit
+(Zoekjaar) allowing graduates to stay 1 year job hunting. Dutch
+tech companies actively recruit international graduates from TU
+Delft, TU/e, and UvA.
+COMPLETE DATABASE SCHEMA — ALL 8 TABLES
+This schema replaces the generic e-commerce schema. It is purpose-built for a study abroad consultancy.
+The packages table is new — it stores the 3 country packages as structured records. The knowledge_base
+
+table stores all RAG content. All other tables are adapted from the original Smartilee schema with
+study-abroad-specific field names.
+Table: customers
+id uuid PK DEFAULT gen_random_uuid() phone_number text UNIQUE NOT NULL name text language text
+DEFAULT 'en' -- detected language: en/hi/ml/ta etc tone_preference text DEFAULT 'casual'
+preferred_country text -- 'Germany' | 'France' | 'Netherlands' | NULL interested_package_id
+text -- FK ref to packages table education_level text -- 'Bachelors' | 'Masters' | 'MBA'
+field_of_study text -- e.g. 'Computer Science', 'MBA', 'Engineering' ielts_score float -- e.g.
+6.5, 7.0 budget_range text -- e.g. 'Low (0-5k EUR)', 'Medium (5-15k EUR)' last_active
+timestamptz DEFAULT now() churn_score float DEFAULT 0 is_handoff_active boolean DEFAULT false
+category text DEFAULT 'New' -- Champion/Loyal/At Risk/Lost/New business_id uuid created_at
+timestamptz DEFAULT now()
+Table: packages
+id text PK -- e.g. 'pkg_germany_001' country text NOT NULL -- 'Germany' | 'France' |
+'Netherlands' package_name text NOT NULL overview text tuition_fee text living_cost text
+duration text universities text[] -- array of university names services_included text[]
+services_not_included text[] visa_support text scholarships text intake_months text[]
+eligibility text created_at timestamptz DEFAULT now()
+Table: conversations
+id uuid PK DEFAULT gen_random_uuid() customer_id uuid FK -> customers ON DELETE CASCADE
+direction text CHECK (direction IN ('inbound','outbound')) message_text text intent_label text
+-- enquiry/purchase_intent/complaint/churn_risk/general sentiment text --
+positive/neutral/negative action_taken text -- auto_reply/upsell/handoff/schedule_followup
+language text package_context text -- which package was discussed, if any timestamp timestamptz
+DEFAULT now()
+Table: enquiry_events
+id uuid PK DEFAULT gen_random_uuid() customer_id uuid FK ON DELETE CASCADE package_id text --
+which package they enquired about country text status text DEFAULT 'active' CHECK (status IN
+('active','abandoned','converted','followup_sent')) notes text -- counsellor notes created_at
+timestamptz DEFAULT now() updated_at timestamptz DEFAULT now()
+Table: handoff_queue
+id uuid PK DEFAULT gen_random_uuid() customer_id uuid FK ON DELETE CASCADE reason text
+package_discussed text -- which package triggered the escalation status text DEFAULT 'pending'
+CHECK (status IN ('pending','resolved')) created_at timestamptz DEFAULT now() resolved_at
+timestamptz
+Table: followups
+id uuid PK DEFAULT gen_random_uuid() customer_id uuid FK ON DELETE CASCADE scheduled_at
+timestamptz message_hint text -- e.g. 'Send Germany intake reminder' package_id text --
+relevant package status text DEFAULT 'pending' CHECK (status IN ('pending','sent','cancelled'))
+created_at timestamptz DEFAULT now()
+Table: knowledge_base
+
+id uuid PK DEFAULT gen_random_uuid() package_id text -- e.g. 'pkg_germany_001' (NULL = general
+knowledge) country text -- 'Germany' | 'France' | 'Netherlands' | 'General' category text --
+'tuition' | 'visa' | 'scholarships' | 'living' | 'universities' | 'eligibility' | 'intake' |
+'faq' | 'services' title text -- short label: 'Germany Tuition Fees' content text -- full plain
+text the AI reads and quotes from embedding vector(1536) -- pgvector column, filled at startup
+by AI engineer created_at timestamptz DEFAULT now()
+PGVECTOR SETUP — RUN FIRST IN SUPABASE SQL EDITOR
+CREATE EXTENSION IF NOT EXISTS vector; CREATE OR REPLACE FUNCTION match_knowledge_base(
+query_embedding vector(1536), match_count int DEFAULT 4, filter_country text DEFAULT NULL,
+filter_category text DEFAULT NULL ) RETURNS TABLE ( id uuid, package_id text, country text,
+category text, title text, content text, similarity float ) LANGUAGE plpgsql AS $$ BEGIN RETURN
+QUERY SELECT kb.id, kb.package_id, kb.country, kb.category, kb.title, kb.content, 1 -
+(kb.embedding <=> query_embedding) AS similarity FROM knowledge_base kb WHERE kb.embedding IS
+NOT NULL AND (filter_country IS NULL OR kb.country = filter_country) AND (filter_category IS
+NULL OR kb.category = filter_category) ORDER BY kb.embedding <=> query_embedding LIMIT
+match_count; END; $$;
+The updated RPC function adds optional filter_country and filter_category parameters. If a student asks
+specifically about Germany, the AI engineer can pass filter_country='Germany' to retrieve only
+Germany-relevant knowledge base rows — making RAG results more precise.
+KNOWLEDGE BASE SEED DATA — WHAT TO INSERT
+Insert one row per fact. The more granular the rows, the better the RAG retrieval. Target: 30–50 rows
+minimum. Examples below — expand with all details from the 3 packages above.
+Germany / tuition
+Germany Tuition Fee
+Public universities in Germany charge 0 to 1,500 EUR per year. Most public universities ch...
+Germany / visa
+Germany Blocked Account
+Students applying for a German student visa must open a blocked account with approximately...
+Germany / visa
+Germany APS Certificate
+Indian students applying to German universities must obtain an APS (Academic Evaluation Ce...
+Germany / scholarships
+DAAD Scholarship Germany
+The DAAD (German Academic Exchange Service) offers scholarships for international students...
+Germany / living
+Germany Living Costs
+Students in Germany spend 850 to 1,200 EUR per month. Breakdown: rent 300-600 EUR, food 20...
+Germany / eligibility
+Germany Eligibility
+Applicants need a minimum of 70% in previous education, IELTS 6.5 or equivalent (TOEFL 90+...
+Germany / universities
+Germany Universities List
+Top universities in our Germany package: Technical University of Munich (TUM), RWTH Aachen...
+Germany / intake
+Germany Intake Dates
+Germany has two intakes: Winter semester starting September/October (main intake, most pro...
+France / tuition
+France Business School Tuition
+Top French business schools charge 8,000 to 20,000 EUR per year. HEC Paris MSc programs ra...
+France / scholarships
+Eiffel Excellence Scholarship
+The Eiffel Excellence Scholarship is a French government award covering tuition fees, a mo...
+
+France / visa
+France Campus France Process
+All students from most countries must register on Campus France before applying for a stud...
+France / living
+France Living Costs
+Monthly living costs in France range 900 to 1,400 EUR. Paris is more expensive at 1,200 to...
+France / eligibility
+France Eligibility
+Requirements: completed Bachelor's degree, IELTS 6.5 or above, GMAT recommended (690+
+aver...
+France / universities
+France Universities List
+Schools in our France package: HEC Paris, ESSEC Business School, EDHEC Business School, IN...
+Netherlands / tuition
+Netherlands Tuition Fee
+Tuition for non-EEA international students in the Netherlands ranges 6,000 to 15,000 EUR p...
+Netherlands /
+scholarships
+Holland Scholarship
+The Holland Scholarship is a Dutch government award of 5,000 EUR (one-time) for non-EEA st...
+Netherlands / visa
+Netherlands MVV Residence Permit
+Non-EEA students need an MVV (provisional residence permit) to enter the Netherlands for s...
+Netherlands / living
+Netherlands Living Costs
+Living costs in the Netherlands range 900 to 1,300 EUR per month. Amsterdam and Delft aver...
+Netherlands /
+universities
+Netherlands Universities List
+Universities in our Netherlands package: TU Delft (top 50 QS), University of Amsterdam, Ei...
+Netherlands / faq
+Netherlands Post-Study Visa
+The Netherlands offers an Orientation Year Permit (Zoekjaar) allowing graduates to stay 1 ...
+General / faq
+How to Choose Between Germany France Netherlands
+Germany is best for students prioritising low cost and STEM programs. France suits student...
+General / faq
+General Work While Studying
+Germany: up to 120 full days or 240 half days per year. France: up to 964 hours per year (...
+Target: 30–50 total rows. Add one row per FAQ, one per scholarship detail, one per university profile, one per visa step.
+DEMO SEED DATA — CUSTOMERS FOR HACKATHON DEMO
+Priya Nair (+919876543210)
+Country: Germany | Package: pkg_germany_001
+Lang: ml | Level: Masters | Field: Computer Science | IELTS: 6.5
+Category: At Risk | Churn: 0.8 | Note: Enquired about TU Munich, abandoned
+mid-application, inactive 12 days
+Arjun Mehta
+(+919000000001)
+Country: France | Package: pkg_france_001
+Lang: en | Level: MBA | Field: Business | IELTS: 7.0
+Category: Champion | Churn: 0.2 | Note: Completed Campus France, applied to HEC
+Paris, highly engaged
+Meena Pillai
+(+919000000002)
+Country: Netherlands | Package: pkg_netherlands_001
+Lang: ta | Level: Masters | Field: Data Science | IELTS: 6.5
+Category: Lost | Churn: 0.9 | Note: Inactive 45 days, TU Delft application not completed
+ROW-LEVEL SECURITY + REAL-TIME SETUP
+Enable RLS on all tables. Add SELECT/INSERT/UPDATE policies using business_id = auth.uid() for tables
+with direct business_id, and EXISTS subquery through customers for joined tables. Use service_role key on
+all backend servers to bypass RLS. Enable real-time on enquiry_events and handoff_queue in Supabase
+Dashboard under Database > Replication — these power the live abandonment listener and handoff alerts.
+
+IMPACT ON OTHER ENGINEER FILES — WHAT CHANGES
+AI Backend Engineer
+Minor changes only. The RAG pipeline (rag.py) and knowledge base loading logic stay identical — only the content of
+the knowledge_base table changes (now study abroad data instead of generic products). The match_knowledge_base
+RPC now accepts filter_country and filter_category params — update retrieve_context() to pass these when a student
+specifies a country. Intent labels stay the same. Prompt templates: replace references to 'products/orders' with
+'packages/countries'. Churn scoring formula: replace 'abandoned_carts' with 'abandoned_enquiries' from
+enquiry_events table.
+Integration Engineer
+No structural changes. Webhook routing logic, Happilee connection, sendMessage(), sendTemplate(), cart
+abandonment trigger → rename to enquiry_abandonment trigger (same logic, different table: enquiry_events instead of
+cart_events). Inactivity cron is identical. Handoff logic is identical. Only table names and field names change in
+Supabase queries.
+Frontend Engineer
+Moderate UI changes. Replace 'cart' language with 'enquiry/package'. CustomerProfileScreen Section 2 now shows
+preferred_country, interested_package_id, education_level, field_of_study, and IELTS score instead of cart contents.
+Add a PackagesScreen showing the 3 country package cards with key details. ChurnRiskScreen stays identical —
+same logic, different data. Dashboard stat cards: replace 'Cart Recoveries' with 'Enquiry Conversions'. Everything else
+(real-time, handoff queue, conversations, customer list) is structurally unchanged.
+MASTER PROMPTS — INPUT INTO AI ONE BY ONE
+PROMPT 1 — Full Schema + pgvector + Packages Table
+I am building the Supabase database for a WhatsApp AI platform called Smartilee, used by a study abroad consultancy.
+Write the complete SQL migration script for these tables: 1. Enable pgvector. 2. customers: id uuid pk, phone_number
+text unique not null, name text, language text default 'en', tone_preference text default 'casual', preferred_country text,
+interested_package_id text, education_level text, field_of_study text, ielts_score float, budget_range text, last_active
+timestamptz default now(), churn_score float default 0, is_handoff_active boolean default false, category text default
+'New', business_id uuid, created_at timestamptz default now(). 3. packages: id text pk, country text not null,
+package_name text, overview text, tuition_fee text, living_cost text, duration text, universities text[], services_included
+text[], services_not_included text[], visa_support text, scholarships text, intake_months text[], eligibility text, created_at
+timestamptz default now(). 4. conversations: id uuid pk, customer_id uuid fk->customers, direction text check(in
+'inbound','outbound'), message_text text, intent_label text, sentiment text, action_taken text, language text,
+package_context text, timestamp timestamptz default now(). 5. enquiry_events: id uuid pk, customer_id uuid fk,
+package_id text, country text, status text check(in 'active','abandoned','converted','followup_sent'), notes text,
+created_at and updated_at timestamptz. 6. handoff_queue: id uuid pk, customer_id uuid fk, reason text,
+package_discussed text, status pending/resolved, created_at, resolved_at. 7. followups: id uuid pk, customer_id uuid fk,
+scheduled_at, message_hint text, package_id text, status pending/sent/cancelled, created_at. 8. knowledge_base: id
+uuid pk, package_id text, country text, category text, title text, content text, embedding vector(1536), created_at. 9.
+match_knowledge_base RPC with filter_country and filter_category optional params. Include gen_random_uuid() PKs
+and ON DELETE CASCADE on all FKs. Show full SQL.
+
+PROMPT 2 — RLS + Real-Time
+For my Smartilee study abroad Supabase database, write SQL to: 1. Enable RLS on all 8 tables. 2. Add SELECT,
+INSERT, UPDATE policies. Tables with business_id: WHERE business_id = auth.uid(). Others: EXISTS subquery
+through customers. knowledge_base: SELECT for all authenticated users. 3. ALTER TABLE enquiry_events REPLICA
+IDENTITY FULL. ALTER TABLE handoff_queue REPLICA IDENTITY FULL. 4. Explain service_role key usage for
+server-side bypass.
+PROMPT 3 — All Query Functions (Python + JS)
+For my Smartilee study abroad Supabase database, write query functions in Python (supabase-py) and JavaScript
+(@supabase/supabase-js) for: 1. upsert_customer(phone, name, language, preferred_country, education_level,
+field_of_study, ielts_score). 2. get_customer_profile(phone). 3. log_conversation(customer_id, direction, message_text,
+intent_label, sentiment, action_taken, language, package_context). 4. get_conversations(customer_id, limit=20). 5.
+get_churn_risk_customers(threshold=0.7). 6. get_dashboard_stats() — messages today, AI reply rate, handoff count,
+enquiry conversions, customers_by_category. 7. get_all_packages(). 8. get_package_by_id(package_id). 9.
+get_all_customers(category_filter, sort_by). 10. get_knowledge_base_rows(). 11.
+update_knowledge_base_embedding(id, embedding). Show Python and JS versions with error handling.
+PROMPT 4 — Seed Data Script (Packages + Knowledge Base + Customers)
+Write an idempotent Python script using supabase-py to seed my Smartilee study abroad database. Insert 3 packages:
+pkg_germany_001 (Germany Public University Starter, tuition 0-1500 EUR), pkg_france_001 (France Business School
+Premium, tuition 8000-20000 EUR), pkg_netherlands_001 (Netherlands Tech & Innovation, tuition 6000-15000 EUR).
+Insert at least 20 knowledge_base rows covering tuition, visa, scholarships, living costs, universities, eligibility, and
+FAQs for all 3 countries. Insert 3 demo customers: Priya (ml, Germany, At Risk, churn 0.8), Arjun (en, France,
+Champion, churn 0.2), Meena (ta, Netherlands, Lost, churn 0.9, inactive 45 days). Add enquiry_events, conversations,
+and followups for each. Load .env. Print success/skip per step.
+ Smartilee · Database Engineer · Study Abroad Edition · Hackathon 2025 · v2.0
+ 
