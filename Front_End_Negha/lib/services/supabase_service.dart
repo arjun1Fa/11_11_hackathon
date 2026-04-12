@@ -364,21 +364,27 @@ class SupabaseService {
   }
 
   Future<void> resolveHandoff(String handoffId, String customerId) async {
-    // 1. Try to resolve the specific queue entry if it exists
-    if (!handoffId.startsWith('legacy-')) {
-      await client.from('handoff_queue').update({
-        'status': 'resolved',
-        'resolved_at': DateTime.now().toIso8601String(),
-      }).eq('id', handoffId);
-    } else {
-      // If it was a synthetic entry (flag-only), try to resolve any pending queue items for this customer anyway
-      await client.from('handoff_queue').update({
-        'status': 'resolved',
-        'resolved_at': DateTime.now().toIso8601String(),
-      }).eq('customer_id', customerId).neq('status', 'resolved');
+    try {
+      // 1. Try to resolve the specific queue entry if it exists
+      if (!handoffId.startsWith('legacy-') && !handoffId.startsWith('rescue-')) {
+        await client.from('handoff_queue').update({
+          'status': 'resolved',
+          'resolved_at': DateTime.now().toIso8601String(),
+        }).eq('id', handoffId);
+      } else {
+        // If it was a synthetic entry (flag-only or rescued from chat), 
+        // try to resolve any pending queue items for this customer anyway
+        await client.from('handoff_queue').update({
+          'status': 'resolved',
+          'resolved_at': DateTime.now().toIso8601String(),
+        }).eq('customer_id', customerId).neq('status', 'resolved');
+      }
+    } catch (e) {
+      // Even if history update fails, we proceed to clear the active flag
+      print('Handoff history update failed (likely RLS), proceeding to clear flag: $e');
     }
 
-    // 2. Clear the global flag in customers table
+    // 2. Clear the global flag in customers table (Fail-safe)
     await updateCustomerHandoff(customerId, false);
   }
 
