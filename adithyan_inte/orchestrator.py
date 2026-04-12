@@ -1,326 +1,310 @@
 """
 orchestrator.py
 ---------------
-Core pipeline coordinator for Smartilee.
-
-For every inbound message this module:
-  1. Calls the AI backend /analyze endpoint.
-  2. Writes the conversation record to Supabase.
-  3. Routes the AI action to the appropriate handler
-     (auto_reply | upsell | handoff | schedule_followup).
-  4. Returns the response payload to the caller (app.py).
+Integration Orchestrator — The "Bridge" between WhatsApp and the AI Backend.
 """
 
 import os
 import logging
-from datetime import datetime, timezone
-
 import requests
-
+from datetime import datetime, timezone
 from supabase_client import supabase
-from messaging import send_outbound_message
+from whatsapp import send_whatsapp_message, mark_message_read
 from handoff import handle_handoff
+from churn_scorer import compute_churn_score
 
 logger = logging.getLogger(__name__)
 
-# ── AI backend base URL (runs separately; see ai_backend/) ──────────────────
+# Teammate's AI Backend URL
 AI_BACKEND_URL: str = os.getenv("AI_BACKEND_URL", "http://localhost:5001")
 
+# Simulator Mode — routes replies back to the local simulator UI instead of WhatsApp
+SIMULATOR_MODE: bool = os.getenv("SIMULATOR_MODE", "false").lower() == "true"
+SIMULATOR_REPLY_URL: str = os.getenv("SIMULATOR_REPLY_URL", "http://localhost:5050/receive")
 
-# ═══════════════════════════════════════════════════════════════════════════
-# Public entry point
-# ═══════════════════════════════════════════════════════════════════════════
-
-def process_message(phone_number: str, message_text: str, source: str) -> dict:
+def process_whatsapp_message(phone_number: str, message_text: str, wa_msg_id: str) -> None:
     """
-    Full orchestration pipeline for one inbound message.
-
-    Args:
-        phone_number: Sender's phone number (unique customer key).
-        message_text: Raw message content.
-        source:       'web' | 'whatsapp'
-
-    Returns:
-        dict with keys: status, action, response (optional), handoff_id (optional).
+    Core integration pipeline:
+    1. Check handoff status.
+    2. Mark message as read.
+    3. Call teammate's AI backend.
+    4. Log conversation.
+    5. Dispatch AI response.
     """
-    # ── 1. Handoff guard ─────────────────────────────────────────────────
-    customer = _get_or_create_customer(phone_number)
+    
+    # ── 1. Handoff Guard ────────────────────────────────────────────────
+    res = supabase.table("customers").select("id, is_handoff_active").eq("phone_number", phone_number).execute()
+    customer = res.data[0] if res.data else None
+    
+    if customer and customer.get("is_handoff_active"):
+        logger.info("Handoff active for %s — logging message without AI reply.", phone_number)
+        _log_conversation(phone_number, message_text, "inbound", {"skipped": "handoff_active"})
+        return
 
-    if customer.get("is_handoff_active"):
-        logger.info("Handoff active for %s — logging message, skipping AI.", phone_number)
-        _log_conversation(
-            customer_id=customer["id"],
-            phone_number=phone_number,
-            message_text=message_text,
-            direction="inbound",
-            source=source,
-            ai_metadata={"skipped": "handoff_active"},
-        )
-        return {"status": "ok", "action": "handoff_active", "response": None}
+    # ── 2. UI Feedback ──────────────────────────────────────────────────
+    mark_message_read(wa_msg_id)
 
-    # ── 2. AI analysis ───────────────────────────────────────────────────
-    ai_result = _call_ai_analyze(phone_number, message_text)
+    # ── 3. Call Teammate's Brain ────────────────────────────────────────
+    # Attempt to analyze and generate a reply in one or two hops
+    ai_data = _call_ai_backend(phone_number, message_text)
+    
+    reply_text = ai_data.get("reply_text") or ai_data.get("response")
+    action = ai_data.get("action", "auto_reply")
+    intent = ai_data.get("intent", "general")
+    
+    # ── 4. Update Customer Profile in Supabase ─────────────────────────
+    _update_customer_profile(phone_number, intent, action)
 
-    intent = ai_result.get("intent", "general")
-    sentiment = ai_result.get("sentiment", "neutral")
-    action = ai_result.get("action", "auto_reply")
-    churn_score = ai_result.get("churn_score", 0.0)
-    language = ai_result.get("language", "en")
+    # ── 5. Log Encounter ────────────────────────────────────────────────
+    _log_conversation(phone_number, message_text, "inbound", ai_data)
 
-    # ── 3. Log inbound message + AI metadata ─────────────────────────────
-    _log_conversation(
-        customer_id=customer["id"],
-        phone_number=phone_number,
-        message_text=message_text,
-        direction="inbound",
-        source=source,
-        ai_metadata={
-            "intent": intent,
-            "sentiment": sentiment,
-            "action": action,
-            "churn_score": churn_score,
-            "language": language,
-        },
-    )
-
-    # Optionally update churn score on the customer profile
-    _update_churn_score(customer["id"], churn_score)
-
-    # ── 4. Action routing ────────────────────────────────────────────────
-    if action == "auto_reply":
-        return _handle_auto_reply(phone_number, message_text, customer, ai_result)
-
-    if action == "upsell":
-        return _handle_upsell(phone_number, message_text, customer, ai_result)
-
+    # ── 5. Action Routing ───────────────────────────────────────────────
     if action == "handoff":
-        return _handle_handoff_action(phone_number, customer, intent)
+        handle_handoff(phone_number, trigger_reason=f"AI Intent: {intent}")
+    elif action == "start_call":
+        if SIMULATOR_MODE:
+            try:
+                import requests as _req
+                _req.post(SIMULATOR_REPLY_URL, json={
+                    "text": reply_text or "Connecting you to a voice counsellor...",
+                    "metadata": {"intent": intent, "action": "start_call"}
+                }, timeout=5)
+                logger.info("[SIM MODE] Call triggered in simulator UI")
+            except Exception as e:
+                logger.warning("[SIM MODE] Could not reach simulator for call: %s", e)
+        else:
+            # Fallback for real WhatsApp: send a text alerting them of the call
+            send_whatsapp_message(to=phone_number, message="Connecting you to a voice counsellor. You will receive a call momentarily.", reply_to_msg_id=wa_msg_id)
+        
+        _log_conversation(phone_number, "CALL TRIGGERED", "outbound", {"type": "call_start"})
 
-    if action == "schedule_followup":
-        return _handle_schedule_followup(phone_number, customer, message_text, ai_result)
+    elif reply_text:
+        if SIMULATOR_MODE:
+            try:
+                import requests as _req
+                _req.post(SIMULATOR_REPLY_URL, json={
+                    "text": reply_text,
+                    "metadata": {"intent": intent, "action": action}
+                }, timeout=5)
+                logger.info("[SIM MODE] Reply sent to simulator UI")
+            except Exception as e:
+                logger.warning("[SIM MODE] Could not reach simulator: %s", e)
+        else:
+            send_whatsapp_message(to=phone_number, message=reply_text, reply_to_msg_id=wa_msg_id)
+        _log_conversation(phone_number, reply_text, "outbound", {"type": "auto_reply"})
 
-    # Fallback — treat unknown actions as auto_reply
-    logger.warning("Unknown action '%s' — falling back to auto_reply.", action)
-    return _handle_auto_reply(phone_number, message_text, customer, ai_result)
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# Action handlers
-# ═══════════════════════════════════════════════════════════════════════════
-
-def _handle_auto_reply(
-    phone_number: str, message_text: str, customer: dict, ai_result: dict
-) -> dict:
-    """Calls /generate-reply and returns the generated text."""
-    reply = _call_generate_reply(phone_number, message_text, ai_result)
-
-    send_outbound_message(
-        recipient=phone_number,
-        message=reply,
-        message_type="auto_reply",
-        customer_id=customer.get("id"),
-    )
-
-    # Log the outbound reply (persisted inside send_outbound_message)
-    return {"status": "ok", "action": "auto_reply", "response": reply}
-
-
-def _handle_upsell(
-    phone_number: str, message_text: str, customer: dict, ai_result: dict
-) -> dict:
-    """Calls /upsell and returns the product recommendation."""
-    recommendation = _call_upsell(phone_number, message_text, ai_result)
-
-    send_outbound_message(
-        recipient=phone_number,
-        message=recommendation,
-        message_type="upsell",
-        customer_id=customer.get("id"),
-    )
-
-    return {"status": "ok", "action": "upsell", "response": recommendation}
-
-
-def _handle_handoff_action(
-    phone_number: str, customer: dict, trigger_reason: str
-) -> dict:
-    """Delegates to the handoff module."""
-    result = handle_handoff(
-        phone_number=phone_number,
-        trigger_reason=f"AI intent: {trigger_reason}",
-    )
-    return {
-        "status": "ok",
-        "action": "handoff",
-        "handoff_id": result.get("handoff_id"),
-    }
-
-
-def _handle_schedule_followup(
-    phone_number: str, customer: dict, message_text: str, ai_result: dict
-) -> dict:
-    """Inserts a row into the `followups` table for later processing."""
-    payload = {
-        "customer_id": customer["id"],
-        "phone_number": phone_number,
-        "trigger_reason": "AI recommended follow-up",
-        "original_message": message_text,
-        "ai_metadata": ai_result,
-        "status": "pending",
-        "scheduled_at": datetime.now(timezone.utc).isoformat(),
-    }
+def _get_conversation_history(phone_number: str, limit: int = 10) -> list:
+    """Fetches the last N messages from Supabase to provide context to the AI."""
     try:
-        supabase.table("followups").insert(payload).execute()
-        logger.info("Follow-up scheduled for %s.", phone_number)
-    except Exception as exc:
-        logger.error("Failed to schedule follow-up for %s: %s", phone_number, exc)
-
-    return {"status": "ok", "action": "schedule_followup", "response": None}
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# AI backend callers
-# ═══════════════════════════════════════════════════════════════════════════
-
-def _call_ai_analyze(phone_number: str, message_text: str) -> dict:
-    """
-    POST /analyze  →  {intent, sentiment, action, churn_score, language}
-    Falls back to a safe default dict on failure so the pipeline never crashes.
-    """
-    try:
-        response = requests.post(
-            f"{AI_BACKEND_URL}/analyze",
-            json={"phone_number": phone_number, "message": message_text},
-            timeout=15,
-        )
-        response.raise_for_status()
-        return response.json()
-    except requests.RequestException as exc:
-        logger.error("AI /analyze call failed: %s", exc)
-        return {
-            "intent": "general",
-            "sentiment": "neutral",
-            "action": "auto_reply",
-            "churn_score": 0.0,
-            "language": "en",
-        }
-
-
-def _call_generate_reply(
-    phone_number: str, message_text: str, ai_result: dict
-) -> str:
-    """POST /generate-reply  →  reply string."""
-    try:
-        response = requests.post(
-            f"{AI_BACKEND_URL}/generate-reply",
-            json={
-                "phone_number": phone_number,
-                "message": message_text,
-                "ai_context": ai_result,
-            },
-            timeout=20,
-        )
-        response.raise_for_status()
-        return response.json().get("reply", "Thank you for your message! We'll get back to you shortly.")
-    except requests.RequestException as exc:
-        logger.error("AI /generate-reply call failed: %s", exc)
-        return "Thank you for reaching out! Our team will respond shortly."
-
-
-def _call_upsell(phone_number: str, message_text: str, ai_result: dict) -> str:
-    """POST /upsell  →  recommendation string."""
-    try:
-        response = requests.post(
-            f"{AI_BACKEND_URL}/upsell",
-            json={
-                "phone_number": phone_number,
-                "message": message_text,
-                "ai_context": ai_result,
-            },
-            timeout=15,
-        )
-        response.raise_for_status()
-        return response.json().get("recommendation", "We have some great options for you!")
-    except requests.RequestException as exc:
-        logger.error("AI /upsell call failed: %s", exc)
-        return "We have some exciting offers that might interest you!"
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# Supabase helpers
-# ═══════════════════════════════════════════════════════════════════════════
-
-def _get_or_create_customer(phone_number: str) -> dict:
-    """
-    Fetches the customer by phone number.
-    Creates a minimal profile if they don't exist yet.
-    """
-    try:
-        result = (
-            supabase.table("customers")
-            .select("id, name, is_handoff_active, churn_score")
-            .eq("phone_number", phone_number)
-            .maybe_single()
+        res = supabase.table("conversations") \
+            .select("message_text, direction") \
+            .eq("phone_number", phone_number) \
+            .order("created_at", desc=True) \
+            .limit(limit) \
             .execute()
-        )
-        if result.data:
-            return result.data
+        
+        # Format for AI: role (user/assistant) and content
+        history = []
+        for msg in reversed(res.data or []):
+            history.append({
+                "role": "user" if msg["direction"] == "inbound" else "assistant",
+                "content": msg["message_text"]
+            })
+        
+        logger.info("[AI] Successfully fetched %d messages of history for %s", len(history), phone_number)
+        return history
+    except Exception as e:
+        logger.warning(f"[AI] Failed to fetch history for {phone_number}: {e}")
+        return []
 
-        # New customer — create a minimal profile
-        insert_result = (
-            supabase.table("customers")
-            .insert(
-                {
-                    "phone_number": phone_number,
-                    "name": phone_number,  # overwritten when real name is known
-                    "is_handoff_active": False,
-                    "churn_score": 0.0,
-                    "created_at": datetime.now(timezone.utc).isoformat(),
-                }
-            )
-            .execute()
-        )
-        logger.info("New customer profile created for %s.", phone_number)
-        return insert_result.data[0]
-
-    except Exception as exc:
-        logger.error("Error in _get_or_create_customer for %s: %s", phone_number, exc)
-        # Return a safe fallback so the pipeline can continue
-        return {"id": None, "is_handoff_active": False, "churn_score": 0.0}
-
-
-def _log_conversation(
-    customer_id: str | None,
-    phone_number: str,
-    message_text: str,
-    direction: str,
-    source: str,
-    ai_metadata: dict,
-) -> None:
-    """Writes a conversation row to the `conversations` table."""
+def _call_ai_backend(phone_number: str, message_text: str) -> dict:
+    """
+    Communicates with the teammate's AI backend.
+    Sends history + current message for better context (memory).
+    """
+    base_url = AI_BACKEND_URL.rstrip("/")
+    history = _get_conversation_history(phone_number)
+    
+    # ── STEP 1: Analyze Intent and Action ────────────────────────────
     try:
-        supabase.table("conversations").insert(
-            {
-                "customer_id": customer_id,
+        logger.info("[AI] Calling /analyze for %s (context size: %d turns)...", phone_number, len(history))
+        response = requests.post(
+            f"{base_url}/analyze",
+            json={
                 "phone_number": phone_number,
                 "message_text": message_text,
-                "direction": direction,
-                "source": source,
-                "ai_metadata": ai_metadata,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-            }
-        ).execute()
+                "messages": history,   # Renamed from 'history' to 'messages'
+                "chat_history": history # Also sending this just in case
+            },
+            timeout=60
+        )
+        response.raise_for_status()
+        ai_data = response.json()
+        
+        action = ai_data.get("action", "auto_reply")
+        intent = ai_data.get("intent", "general")
+        logger.info("[AI] Action: %s | Intent: %s", action, intent)
+
+        # ── STEP 2: Generate Reply Text (only if needed) ─────────────
+        if action in ["auto_reply", "start_call", "onboarding"]:
+            logger.info("[AI] Calling /generate-reply...")
+            gen_resp = requests.post(
+                f"{base_url}/generate-reply",
+                json={
+                    "phone_number": phone_number,
+                    "message_text": message_text,
+                    "messages": history,
+                    "chat_history": history
+                },
+                timeout=60
+            )
+            gen_resp.raise_for_status()
+            gen_data = gen_resp.json()
+            
+            # Merge the generated text into our data
+            ai_data["reply_text"] = gen_data.get("reply_text") or gen_data.get("response")
+            logger.info("[AI] Reply generated: %s...", ai_data["reply_text"][:30])
+        
+        return ai_data
+
     except Exception as exc:
-        logger.error("Failed to log conversation: %s", exc)
+        logger.error("[AI] Orchestration error: %s", exc)
+        # Safe fallback based on the error type
+        return {
+            "reply_text": f"Sorry, I had trouble reaching the AI. (Error: {str(exc)[:50]}...)",
+            "action": "auto_reply",
+            "intent": "error_fallback"
+        }
 
-
-def _update_churn_score(customer_id: str | None, churn_score: float) -> None:
-    """Updates the customer's churn score if it changed."""
-    if not customer_id:
-        return
+def _update_customer_profile(phone_number: str, intent: str, action: str) -> None:
+    """
+    After every conversation, update the customer's profile in Supabase:
+    - last_active  → set to NOW (marks them as recently engaged)
+    - churn_score  → recomputed using the weighted formula
+    - risk_level   → low / medium / high
+    - last_intent  → stores what the AI understood they wanted
+    """
     try:
-        supabase.table("customers").update(
-            {"churn_score": churn_score}
-        ).eq("id", customer_id).execute()
+        now = datetime.now(timezone.utc).isoformat()
+        
+        # Step 1: Mark as active right now
+        supabase.table("customers").update({
+            "last_active": now
+        }).eq("phone_number", phone_number).execute()
+        
+        # Step 2: Recompute churn score
+        churn_data = compute_churn_score(phone_number)
+        churn_score = churn_data.get("churn_score", 0.0)
+        risk_level  = churn_data.get("risk_level", "low")
+        
+        # Step 3: Write everything back
+        supabase.table("customers").update({
+            "churn_score": churn_score,
+            "risk_level":  risk_level,
+            "last_intent": intent,
+        }).eq("phone_number", phone_number).execute()
+        
+        logger.info(
+            "[PROFILE] %s → active=%s | churn=%.2f (%s) | intent=%s",
+            phone_number, now[:19], churn_score, risk_level, intent
+        )
     except Exception as exc:
-        logger.warning("Failed to update churn score for %s: %s", customer_id, exc)
+        logger.warning("[PROFILE] Update skipped (schema or DB issue): %s", exc)
+
+
+def _log_conversation(phone_number: str, text: str, direction: str, metadata: dict) -> None:
+    """Logs history to Supabase — uses only the most basic columns to avoid schema errors."""
+    try:
+        supabase.table("conversations").insert({
+            "phone_number": phone_number,
+            "message_text": text,
+            "direction": direction
+        }).execute()
+    except Exception:
+        # Silently fail logging if DB is not ready
+        pass
+
+
+# ── Telegram Pipeline ─────────────────────────────────────────────────────────
+
+def process_telegram_message(
+    chat_id: str,
+    message_text: str,
+    telegram_msg_id: str
+) -> None:
+    """
+    Telegram integration pipeline — mirrors process_whatsapp_message.
+    Uses chat_id as the unique user identifier instead of phone_number.
+
+    Flow:
+      1. Guard against handoff-active users
+      2. Show typing indicator
+      3. Call AI backend
+      4. Log + dispatch reply
+    """
+    from telegram_bot import send_telegram_message, send_typing_action
+
+    logger.info("[TELEGRAM] Incoming from chat_id=%s | text=%s", chat_id, message_text[:50])
+
+    # ── 1. Handoff Guard ─────────────────────────────────────────────────
+    res = supabase.table("customers").select("id, is_handoff_active").eq("phone_number", str(chat_id)).execute()
+    customer = res.data[0] if res.data else None
+
+    if customer and customer.get("is_handoff_active"):
+        logger.info("[TELEGRAM] Handoff active for %s — skipping AI reply.", chat_id)
+        _log_conversation(str(chat_id), message_text, "inbound", {"skipped": "handoff_active"})
+        send_telegram_message(
+            chat_id=chat_id,
+            message="⏳ A human agent is already handling your case. They'll respond shortly.",
+            reply_to_msg_id=telegram_msg_id,
+        )
+        return
+
+    # ── 4. Typing indicator ──────────────────────────────────────────────
+    send_typing_action(chat_id)
+
+    # ── 5. Call Teammate's AI Backend ────────────────────────────────────
+    ai_data    = _call_ai_backend(phone_number=chat_id, message_text=message_text)
+    reply_text = ai_data.get("reply_text") or ai_data.get("response")
+    action     = ai_data.get("action", "auto_reply")
+    intent     = ai_data.get("intent", "general")
+
+    logger.info("[TELEGRAM] Action=%s | Intent=%s", action, intent)
+
+    # ── 6. Log inbound message to Supabase ───────────────────────────────
+    _log_conversation(chat_id, message_text, "inbound", ai_data)
+
+    # ── 7. Dispatch AI reply ──────────────────────────────────────────────
+    if action == "handoff":
+        send_telegram_message(
+            chat_id=chat_id,
+            message="🙋 Connecting you to a human agent now. Please wait a moment!",
+            reply_to_msg_id=telegram_msg_id,
+        )
+        _log_conversation(chat_id, "HANDOFF TRIGGERED", "outbound", {"type": "handoff"})
+
+    elif action == "start_call":
+        send_telegram_message(
+            chat_id=chat_id,
+            message="📞 A voice counsellor will reach out to you shortly!",
+            reply_to_msg_id=telegram_msg_id,
+        )
+        _log_conversation(chat_id, "CALL TRIGGERED", "outbound", {"type": "call_start"})
+
+    elif reply_text:
+        success = send_telegram_message(
+            chat_id=chat_id,
+            message=reply_text,
+            reply_to_msg_id=telegram_msg_id,
+        )
+        if success:
+            _log_conversation(chat_id, reply_text, "outbound", {"type": "auto_reply"})
+
+    else:
+        logger.warning("[TELEGRAM] No reply_text from AI — sending fallback.")
+        send_telegram_message(
+            chat_id=chat_id,
+            message="Sorry, I'm having trouble right now. Please try again in a moment.",
+            reply_to_msg_id=telegram_msg_id,
+        )
+
