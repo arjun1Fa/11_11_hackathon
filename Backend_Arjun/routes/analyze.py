@@ -48,8 +48,12 @@ def analyze():
 
         if customer:
             preferred_country = customer.get("preferred_country")
+            
+            # 3. Pull chat history to give context to the extractor
+            chat_history = get_chat_history(customer["id"], supabase)
+
             # Extract any new profile data from message and update Supabase
-            extracted_data = extract_profile_data(message_text, llm)
+            extracted_data = extract_profile_data(message_text, chat_history, llm)
             if extracted_data:
                 try:
                     supabase.table("customers").update(extracted_data).eq("id", customer["id"]).execute()
@@ -64,16 +68,12 @@ def analyze():
             enq_resp = supabase.table("enquiry_events").select("id").eq("customer_id", customer["id"]).eq("status", "active").execute()
             has_active_enquiry = len(enq_resp.data) > 0
 
-        # 3. Retrieve context (RAG)
+        # 4. Retrieve context (RAG)
         context = retrieve_context(message_text, supabase, filter_country=preferred_country)
 
-        # 4. Fetch Chat History
-        chat_history = ""
-        if customer:
-            chat_history = get_chat_history(customer["id"], supabase)
-
         # 5. Detect Intent
-        intent = detect_intent(message_text, context=context, chat_history=chat_history, llm=llm)
+        chat_hist_val = chat_history if 'chat_history' in locals() else ""
+        intent = detect_intent(message_text, context=context, chat_history=chat_hist_val, llm=llm)
 
         # 6. Detect Sentiment
         sentiment = detect_sentiment(message_text, llm=llm)

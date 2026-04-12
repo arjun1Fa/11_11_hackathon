@@ -44,7 +44,8 @@ def generate_reply_endpoint():
 
         # 1.5 FAILSAFE: If the Integration Engineer skips /analyze, we extract the data here!
         if profile:
-            extracted_data = extract_profile_data(message_text, llm)
+            chat_history = get_chat_history(profile["id"], supabase)
+            extracted_data = extract_profile_data(message_text, chat_history, llm)
             if extracted_data:
                 try:
                     supabase.table("customers").update(extracted_data).eq("id", profile["id"]).execute()
@@ -74,7 +75,7 @@ def generate_reply_endpoint():
         else:
             # 3. Retrieve contextual info
             rag_context = retrieve_context(message_text, supabase)
-            chat_history = get_chat_history(profile.get("id"), supabase) if profile else ""
+            chat_hist_val = chat_history if 'chat_history' in locals() else (get_chat_history(profile.get("id"), supabase) if profile else "")
 
             # 4. Generate Standard Reply
             reply_text = generate_reply(
@@ -84,7 +85,7 @@ def generate_reply_endpoint():
                 language=language,
                 student_profile=profile,
                 rag_context=rag_context,
-                chat_history=chat_history,
+                chat_history=chat_hist_val,
                 llm=llm
             )
 

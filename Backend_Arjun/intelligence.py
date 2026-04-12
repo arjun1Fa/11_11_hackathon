@@ -173,19 +173,22 @@ EXTRACTION_PROMPT = ChatPromptTemplate.from_messages([
 Your job is to read the student's message and extract ONLY the profile information they explicitly mention.
 Do NOT guess or infer missing information. If a piece of information is not mentioned, leave its value completely out of the JSON.
 
+Recent conversational context (use this to understand what the student's message is replying to):
+{chat_history}
+
 Extract exactly these fields if they exist:
 - "name": string
 - "preferred_country": string
 - "education_level": string (e.g. "Bachelors", "Masters", "High School")
 - "field_of_study": string (e.g. "Computer Science", "Business", "Automotive")
-- "ielts_score": number (If they explicitly say they HAVE NOT taken the IELTS, or do not plan to, extract the number -1.0)
+- "ielts_score": number (If they explicitly say they HAVE NOT taken the IELTS, or say 'No' to a question asking if they took it, extract the number -1.0)
 
 Respond with ONLY valid JSON and absolutely no other text.
 """),
     ("human", "{message}")
 ])
 
-def extract_profile_data(message_text: str, llm: ChatOpenAI) -> dict:
+def extract_profile_data(message_text: str, chat_history: str, llm: ChatOpenAI) -> dict:
     """
     Reads a student's message and extracts structured profile data like name or IELTS score.
     Bypasses LangChain's strict json_schema wrapper for Groq compatibility.
@@ -195,7 +198,10 @@ def extract_profile_data(message_text: str, llm: ChatOpenAI) -> dict:
         json_llm = llm.bind(response_format={"type": "json_object"})
         chain = EXTRACTION_PROMPT | json_llm
         
-        result = chain.invoke({"message": message_text})
+        result = chain.invoke({
+            "message": message_text,
+            "chat_history": chat_history or "No previous context."
+        })
         raw_json = result.content.strip()
         
         data = json.loads(raw_json)
