@@ -1,105 +1,38 @@
-# 🗄️ Smartilee Database (Supabase)
+# 🗄️ Smartilee Database (Study Abroad Edition)
 
-## 📌 Overview
+This is the central memory layer for Smartilee Study Abroad. It stores student profiles, packages, conversations, and the RAG knowledge base.
 
-This is the central data layer of Smartilee.
-It stores customer profiles, conversations, cart events, and system data.
+## 🚀 Getting Started
 
----
+1.  **Configure Environment**: Create a `.env` file in this directory:
+    ```env
+    SUPABASE_URL=your_supabase_url
+    SUPABASE_KEY=your_supabase_service_role_key
+    ```
+2.  **Deploy Schema**: Run the contents of [schema.sql](./schema.sql) in your Supabase SQL Editor.
+3.  **Seed Data**: Install dependencies and run the seed script:
+    ```bash
+    pip install -r requirements.txt
+    python seed_data.py
+    ```
 
-## ⚙️ Tech Stack
+## 🏗️ Tables
 
-* Supabase (PostgreSQL)
-* SQL
-* Supabase Realtime
-* Row-Level Security (RLS)
+*   **`customers`**: Student profiles (Digital Twins).
+*   **`packages`**: Structured details of the 3 country packages (DE, FR, NL).
+*   **`knowledge_base`**: Granular facts for RAG (tuition, visa, etc.).
+*   **`conversations`**: Full chat history with sentiment and intent.
+*   **`enquiry_events`**: Tracks active/abandoned enquiries.
+*   **`handoff_queue`**: Live queue for human counsellor escalation.
+*   **`followups`**: Scheduled re-engagement messages.
 
----
+## 🧠 Features
 
-## 🧱 Tables
+*   **pgvector RAG**: Uses `match_knowledge_base` function for semantic search.
+*   **Idempotent Seeding**: Solved the `ON CONFLICT` error by adding a `UNIQUE` constraint on the `title` column of `knowledge_base`.
+*   **Multi-tenant Security**: RLS policies enforce data isolation by `business_id`.
+*   **Real-time Readiness**: Configured for `enquiry_events` and `handoff_queue`.
 
-### customers
+## 🛠️ Query Functions
 
-* Stores customer profile (digital twin)
-
-### conversations
-
-* Stores all messages (inbound + outbound)
-
-### cart_events
-
-* Tracks cart activity (active, abandoned, recovered)
-
-### products
-
-* Product catalog for upselling
-
-### handoff_queue
-
-* Tracks escalations to human agents
-
-### followups
-
-* Scheduled messages
-
----
-
-## ⚡ Features
-
-* Real-time subscriptions
-* Secure multi-tenant access (RLS)
-* Query functions for all services
-* Demo seed data
-
----
-
-## 🔐 Security (RLS)
-
-* Each business accesses only its own data
-* Based on `business_id = auth.uid()`
-
----
-
-## 🔄 Real-Time Setup
-
-Enable for:
-
-* `cart_events`
-* `handoff_queue`
-
-Used for:
-
-* cart recovery triggers
-* live dashboard updates
-
----
-
-## 📊 Example Queries
-
-### Get customer
-
-```
-SELECT * FROM customers WHERE phone_number = '...';
-```
-
-### Log conversation
-
-```
-INSERT INTO conversations (...)
-```
-
----
-
-## 🌱 Seed Data
-
-* Customer: Priya
-* Abandoned cart
-* Sample products
-* Conversation history
-
----
-
-## 🧠 Notes
-
-* Acts as the “memory” of Smartilee
-* Shared across backend, integration, and frontend
+The [query_functions.py](./query_functions.py) file provides a complete SDK for the AI Backend and Integration engineers.
