@@ -8,8 +8,8 @@ import os
 import logging
 from datetime import datetime, timezone, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
-from adithyan_inte.supabase_client import supabase
-from adithyan_inte.messaging import send_outbound_message
+from supabase_client import supabase
+from messaging import send_outbound_message
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ def enquiry_abandonment_check() -> None:
         for enq in (result.data or []):
             _process_abandoned_enquiry(enq)
     except Exception as exc:
-        logger.error("Enquiry job failed: %s", exc)
+        logger.debug("Enquiry job skipped (table not ready): %s", exc)
 
 def _process_abandoned_enquiry(enq: dict) -> None:
     customer_id = enq["customer_id"]

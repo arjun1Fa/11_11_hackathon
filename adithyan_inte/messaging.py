@@ -8,7 +8,7 @@ Removed Happilee and WhatsApp integration as per latest request.
 import os
 import logging
 from datetime import datetime, timezone
-from adithyan_inte.supabase_client import supabase
+from supabase_client import supabase
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,7 @@ def send_outbound_message(
     success = False
     try:
         # 1. Dispatch via WhatsApp Direct
-        from adithyan_inte.whatsapp import send_whatsapp_message
+        from whatsapp import send_whatsapp_message
         success = send_whatsapp_message(to=recipient, message=message)
         
         # 2. Log to Console
