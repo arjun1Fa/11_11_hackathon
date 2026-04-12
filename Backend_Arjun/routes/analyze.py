@@ -99,8 +99,7 @@ def analyze():
         if action == "appointment" and customer:
             try:
                 supabase.table("customers").update({
-                    "appointment_requested": True,
-                    "is_handoff_active": True
+                    "appointment_requested": True
                 }).eq("id", customer["id"]).execute()
             except Exception as e:
                 print(f"[WARN] Failed to set appointment flag: {e}", file=sys.stderr)
