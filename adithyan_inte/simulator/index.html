@@ -1,0 +1,1001 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Smartilee — WhatsApp Simulator</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --wa-green: #00a884;
+    --wa-green-dark: #008069;
+    --wa-teal: #202c33;
+    --wa-sidebar: #111b21;
+    --wa-chat-bg: #0b141a;
+    --wa-msg-in: #202c33;
+    --wa-msg-out: #005c4b;
+    --wa-text: #e9edef;
+    --wa-text-dim: #8696a0;
+    --wa-input-bg: #2a3942;
+    --wa-border: #313d45;
+    --accent: #00a884;
+    --badge-red: #e53935;
+    --font: 'Inter', sans-serif;
+  }
+
+  body {
+    font-family: var(--font);
+    background: var(--wa-chat-bg);
+    color: var(--wa-text);
+    height: 100vh;
+    display: flex;
+    overflow: hidden;
+  }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: 360px;
+    min-width: 360px;
+    background: var(--wa-sidebar);
+    border-right: 1px solid var(--wa-border);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sidebar-header {
+    background: var(--wa-teal);
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 59px;
+  }
+
+  .sidebar-header .profile {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .avatar {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    background: var(--wa-green);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 700; color: white;
+    flex-shrink: 0;
+  }
+
+  .avatar.business {
+    background: linear-gradient(135deg, #1e3a5f, #0a6c5e);
+    font-size: 16px;
+  }
+
+  .sidebar-search {
+    padding: 8px 12px;
+    background: var(--wa-sidebar);
+  }
+
+  .sidebar-search input {
+    width: 100%;
+    background: var(--wa-input-bg);
+    border: none;
+    border-radius: 8px;
+    padding: 9px 16px;
+    color: var(--wa-text);
+    font-size: 14px;
+    outline: none;
+  }
+
+  .chat-list-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 16px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--wa-border);
+    background: var(--wa-green-dark);
+    border-left: 3px solid var(--wa-green);
+  }
+
+  .chat-info { flex: 1; min-width: 0; }
+  .chat-name { font-size: 15px; font-weight: 600; }
+  .chat-preview { font-size: 13px; color: var(--wa-text-dim); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .badge {
+    background: var(--wa-green);
+    color: white;
+    border-radius: 50%;
+    width: 20px; height: 20px;
+    font-size: 11px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700;
+  }
+
+  /* ── Chat Window ── */
+  .chat-window {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: var(--wa-chat-bg);
+    position: relative;
+  }
+
+  /* Subtle WhatsApp pattern */
+  .chat-window::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg width='80' height='80' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0h80v80H0z' fill='%230b141a'/%3E%3Cpath d='M40 40m-2 0a2 2 0 1 0 4 0 2 2 0 1 0-4 0' fill='%23152026' opacity='0.6'/%3E%3C/svg%3E");
+    opacity: 0.4;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .chat-header {
+    background: var(--wa-teal);
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    height: 59px;
+    z-index: 10;
+    border-bottom: 1px solid var(--wa-border);
+  }
+
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #4caf50;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .chat-header-info .name { font-size: 15px; font-weight: 600; }
+  .chat-header-info .status { font-size: 12px; color: var(--wa-green); margin-top: 1px; }
+
+  .header-actions { margin-left: auto; display: flex; gap: 16px; }
+  .header-actions button {
+    background: none; border: none; color: var(--wa-text-dim);
+    cursor: pointer; font-size: 18px; padding: 4px;
+    transition: color 0.2s;
+  }
+  .header-actions button:hover { color: var(--wa-text); }
+
+  /* ── Messages ── */
+  .messages-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 10% 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    z-index: 1;
+  }
+
+  .messages-container::-webkit-scrollbar { width: 6px; }
+  .messages-container::-webkit-scrollbar-track { background: transparent; }
+  .messages-container::-webkit-scrollbar-thumb { background: #3a4a55; border-radius: 4px; }
+
+  .date-divider {
+    text-align: center;
+    margin: 16px 0 8px;
+    position: relative;
+    z-index: 1;
+  }
+  .date-divider span {
+    background: #1f2d35;
+    color: var(--wa-text-dim);
+    font-size: 12px;
+    padding: 4px 12px;
+    border-radius: 8px;
+  }
+
+  .message {
+    max-width: 65%;
+    padding: 7px 12px 6px;
+    border-radius: 8px;
+    font-size: 14px;
+    line-height: 1.5;
+    position: relative;
+    word-break: break-word;
+    animation: msgIn 0.2s ease-out;
+  }
+
+  @keyframes msgIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .message.inbound {
+    background: var(--wa-msg-in);
+    align-self: flex-start;
+    border-top-left-radius: 2px;
+  }
+  .message.inbound::before {
+    content: '';
+    position: absolute;
+    top: 0; left: -8px;
+    border: 8px solid transparent;
+    border-top-color: var(--wa-msg-in);
+    border-right-color: var(--wa-msg-in);
+  }
+
+  .message.outbound {
+    background: var(--wa-msg-out);
+    align-self: flex-end;
+    border-top-right-radius: 2px;
+  }
+  .message.outbound::after {
+    content: '';
+    position: absolute;
+    top: 0; right: -8px;
+    border: 8px solid transparent;
+    border-top-color: var(--wa-msg-out);
+    border-left-color: var(--wa-msg-out);
+  }
+
+  .message-meta {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+    margin-top: 4px;
+  }
+
+  .message-time { font-size: 11px; color: var(--wa-text-dim); }
+
+  .tick { color: var(--wa-text-dim); font-size: 12px; }
+  .tick.delivered { color: var(--wa-green); }
+
+  .intent-badge {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(0,168,132,0.2);
+    color: var(--wa-green);
+    margin-left: 6px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  /* Loading message */
+  .message.typing {
+    background: var(--wa-msg-in);
+    align-self: flex-start;
+    padding: 12px 16px;
+  }
+  .typing-dots { display: flex; gap: 4px; }
+  .typing-dots span {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--wa-text-dim);
+    animation: bounce 1.4s infinite;
+  }
+  .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce {
+    0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+    40% { transform: scale(1); opacity: 1; }
+  }
+
+  /* ── Input Area ── */
+  .input-area {
+    background: var(--wa-teal);
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    z-index: 10;
+  }
+
+  .input-box {
+    flex: 1;
+    background: var(--wa-input-bg);
+    border: none;
+    border-radius: 24px;
+    padding: 11px 16px;
+    color: var(--wa-text);
+    font-size: 15px;
+    font-family: var(--font);
+    outline: none;
+    resize: none;
+    max-height: 120px;
+    overflow-y: auto;
+    transition: background 0.2s;
+  }
+  .input-box:focus { background: #3a4a52; }
+  .input-box::placeholder { color: var(--wa-text-dim); }
+
+  .send-btn {
+    width: 48px; height: 48px;
+    border-radius: 50%;
+    background: var(--wa-green);
+    border: none;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.2s, transform 0.1s;
+    flex-shrink: 0;
+  }
+  .send-btn:hover { background: var(--wa-green-dark); }
+  .send-btn:active { transform: scale(0.95); }
+  .send-btn svg { fill: white; width: 22px; height: 22px; }
+
+  /* ── Debug Panel ── */
+  .debug-panel {
+    width: 320px;
+    min-width: 320px;
+    background: #0d1b22;
+    border-left: 1px solid var(--wa-border);
+    display: flex;
+    flex-direction: column;
+    font-size: 12px;
+  }
+
+  .debug-header {
+    background: var(--wa-teal);
+    padding: 0 16px;
+    height: 59px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid var(--wa-border);
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .debug-header .dot { width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; }
+
+  .debug-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--wa-border);
+  }
+  .debug-tab {
+    flex: 1; padding: 8px; text-align: center;
+    cursor: pointer; color: var(--wa-text-dim); font-size: 12px;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+  }
+  .debug-tab.active { color: var(--wa-green); border-bottom-color: var(--wa-green); }
+
+  .debug-content { flex: 1; overflow-y: auto; padding: 12px; }
+  .debug-content::-webkit-scrollbar { width: 4px; }
+  .debug-content::-webkit-scrollbar-thumb { background: #3a4a55; border-radius: 4px; }
+
+  .log-entry {
+    margin-bottom: 12px;
+    border-left: 2px solid var(--wa-border);
+    padding-left: 10px;
+    animation: msgIn 0.2s ease-out;
+  }
+  .log-entry.success { border-left-color: var(--wa-green); }
+  .log-entry.error { border-left-color: #ef4444; }
+  .log-entry.info { border-left-color: #3b82f6; }
+  .log-entry .log-time { color: var(--wa-text-dim); font-size: 10px; margin-bottom: 4px; }
+  .log-entry .log-label { font-weight: 600; margin-bottom: 4px; font-size: 11px; }
+  .log-entry pre {
+    background: #111b22;
+    padding: 8px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+    color: #9db8c5;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+
+  /* Config panel */
+  .config-box {
+    background: #111b22;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+  .config-box label { font-size: 10px; color: var(--wa-text-dim); display: block; margin-bottom: 4px; }
+  .config-box input {
+    width: 100%;
+    background: var(--wa-input-bg);
+    border: 1px solid var(--wa-border);
+    border-radius: 6px;
+    padding: 6px 10px;
+    color: var(--wa-text);
+    font-size: 12px;
+    outline: none;
+    margin-bottom: 8px;
+  }
+  .config-box input:focus { border-color: var(--wa-green); }
+  .config-save-btn {
+    width: 100%;
+    background: var(--wa-green);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    font-family: var(--font);
+    transition: background 0.2s;
+  }
+  .config-save-btn:hover { background: var(--wa-green-dark); }
+
+  .ngrok-status {
+    display: flex; align-items: center; gap: 6px;
+    background: rgba(0,168,132,0.1);
+    border: 1px solid rgba(0,168,132,0.3);
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin-bottom: 12px;
+    font-size: 11px;
+  }
+
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    gap: 8px;
+    color: var(--wa-text-dim);
+    font-size: 13px;
+    text-align: center;
+    padding: 20px;
+  }
+  .empty-state .icon { font-size: 36px; margin-bottom: 4px; }
+
+  /* ── Call Overlay ── */
+  .call-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(11, 20, 26, 0.95);
+    backdrop-filter: blur(10px);
+    z-index: 200;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.4s ease-out;
+  }
+
+  .call-content {
+    text-align: center;
+    animation: scaleUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+
+  @keyframes scaleUp { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  .call-avatar {
+    width: 140px; height: 140px;
+    border-radius: 50%;
+    margin: 0 auto 30px;
+    border: 4px solid var(--wa-green);
+    overflow: hidden;
+    position: relative;
+  }
+  .call-avatar::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 4px solid rgba(255,255,255,0.1);
+    animation: ripple 2s infinite;
+  }
+
+  @keyframes ripple { 
+    0% { transform: scale(1); opacity: 0.8; }
+    100% { transform: scale(1.4); opacity: 0; }
+  }
+
+  .call-status { color: var(--wa-green); font-weight: 500; text-transform: uppercase; letter-spacing: 2px; font-size: 12px; margin-bottom: 12px; }
+  .call-name { font-size: 28px; font-weight: 600; margin-bottom: 40px; }
+
+  .call-actions { display: flex; gap: 40px; }
+  .call-btn {
+    width: 64px; height: 64px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px;
+    transition: transform 0.2s;
+  }
+  .call-btn:hover { transform: scale(1.1); }
+  .call-btn.decline { background: #ea4335; color: white; }
+  .call-btn.accept { background: #34a853; color: white; animation: shake 1s infinite; }
+
+  @keyframes shake {
+    0%, 100% { transform: rotate(0); }
+    10%, 30%, 50%, 70%, 90% { transform: rotate(-10deg); }
+    20%, 40%, 60%, 80% { transform: rotate(10deg); }
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1f2d35;
+    color: var(--wa-text);
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 13px;
+    opacity: 0;
+    z-index: 100;
+    transition: opacity 0.3s;
+    border: 1px solid var(--wa-border);
+  }
+  .toast.show { opacity: 1; }
+
+  @media (max-width: 900px) {
+    .debug-panel { display: none; }
+    .sidebar { width: 80px; min-width: 80px; }
+    .sidebar-search, .chat-info, .badge { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<div class="sidebar">
+  <div class="sidebar-header">
+    <div class="profile">
+      <div class="avatar business">SM</div>
+      <span style="font-size:14px;font-weight:600;">Smartilee</span>
+    </div>
+    <span style="color:#8696a0;font-size:18px;">⚙</span>
+  </div>
+  <div class="sidebar-search">
+    <input type="text" placeholder="🔍  Search or start new chat" />
+  </div>
+  <div class="chat-list-item">
+    <div class="avatar" id="sidebarAvatar">TS</div>
+    <div class="chat-info">
+      <div class="chat-name" id="sidebarName">Test Student</div>
+      <div class="chat-preview" id="sidebarPreview">Tap to start chatting...</div>
+    </div>
+    <div class="badge" id="unreadBadge" style="display:none">1</div>
+  </div>
+  <div style="flex:1;display:flex;align-items:center;justify-content:center;color:#3a4a55;font-size:12px;text-align:center;padding:20px;">
+    <div>
+      <div style="font-size:28px;margin-bottom:8px;">📱</div>
+      Simulator Mode<br/>Only test chats visible
+    </div>
+  </div>
+</div>
+
+<!-- Voice Call Overlay -->
+<div class="call-overlay" id="callOverlay">
+  <div class="call-content">
+    <div class="call-avatar" id="callAvatar">TS</div>
+    <div class="call-status" id="callStatus">WhatsApp Voice Call</div>
+    <div class="name" style="font-size: 28px; font-weight: 600; margin-bottom: 40px;" id="callName">Test Student</div>
+    <div class="call-actions">
+      <div class="call-btn decline" onclick="endCall()">✖</div>
+      <div class="call-btn accept" onclick="acceptCall()">📞</div>
+    </div>
+  </div>
+</div>
+
+<!-- Chat Window -->
+<div class="chat-window">
+  <div class="chat-header">
+    <div class="avatar" id="headerAvatar">TS</div>
+    <div class="chat-header-info">
+      <div class="name" id="headerName">Test Student</div>
+      <div class="status"><span class="status-dot" style="display:inline-block;width:8px;height:8px;"></span>&nbsp;Online — Connected to Integration Layer</div>
+    </div>
+    <div class="header-actions">
+      <button title="Clear Chat" onclick="clearChat()">🗑</button>
+      <button title="Info" onclick="showToast('Smartilee WhatsApp Simulator v1.0')">ℹ</button>
+    </div>
+  </div>
+
+  <div class="messages-container" id="messagesContainer">
+    <div class="date-divider"><span id="todayLabel">Today</span></div>
+    <!-- Messages will be injected here -->
+    <div class="empty-state" id="emptyState">
+      <div class="icon">💬</div>
+      <strong>Smartilee WhatsApp Simulator</strong>
+      <span>Type a message below to send it to your<br/>integration layer as a Meta webhook.</span>
+    </div>
+  </div>
+
+  <div class="input-area">
+    <span style="font-size:22px;color:#8696a0;cursor:pointer;">😊</span>
+    <textarea
+      class="input-box"
+      id="messageInput"
+      placeholder="Type a message"
+      rows="1"
+    ></textarea>
+    <button class="send-btn" onclick="sendMessage()" id="sendBtn">
+      <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- Debug Panel -->
+<div class="debug-panel">
+  <div class="debug-header">
+    <div class="dot"></div>
+    Developer Panel
+  </div>
+  <div class="debug-tabs">
+    <div class="debug-tab active" onclick="switchTab('logs')">📋 Logs</div>
+    <div class="debug-tab" onclick="switchTab('config')">⚙ Config</div>
+  </div>
+
+  <!-- Logs Tab -->
+  <div class="debug-content" id="tab-logs">
+    <div class="ngrok-status" id="ngrokStatus">
+      <div class="status-dot"></div>
+      <div>
+        <div style="font-weight:600;">Integration Layer</div>
+        <div id="ngrokUrl" style="color:#8696a0;">http://localhost:5000</div>
+      </div>
+    </div>
+    <div id="logEntries">
+      <div class="log-entry info">
+        <div class="log-time">Just now</div>
+        <div class="log-label">🟢 Simulator Ready</div>
+        <pre>Waiting for messages...</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- Config Tab -->
+  <div class="debug-content" id="tab-config" style="display:none">
+    <div class="config-box">
+      <label>Simulated Phone Number</label>
+      <input type="text" id="cfgPhone" placeholder="919999999999" />
+      <label>Student Name</label>
+      <input type="text" id="cfgName" placeholder="Test Student" />
+      <label>Integration Webhook URL</label>
+      <input type="text" id="cfgWebhook" placeholder="http://localhost:5000/webhook" />
+      <button class="config-save-btn" onclick="saveConfig()">💾 Save & Apply</button>
+    </div>
+    <div style="color:#8696a0;font-size:11px;line-height:1.6;">
+      To use ngrok:<br/>
+      1. Run <code style="color:#00a884">ngrok http 5000</code><br/>
+      2. Copy the <code style="color:#00a884">https://...</code> URL<br/>
+      3. Paste it as Integration URL above<br/>
+      4. Save and start chatting!
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── State ────────────────────────────────────────────────────────────────────
+let config = {
+  phone: '919999999999',
+  name: 'Test Student',
+  webhookUrl: '/send'
+};
+let lastTimestamp = null;
+let pollInterval = null;
+let messageCount = 0;
+let typingEl = null;
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+async function init() {
+  // Load config from server
+  try {
+    const r = await fetch('/config');
+    const d = await r.json();
+    config.phone = d.simulator_phone;
+    config.name = d.simulator_name;
+    document.getElementById('ngrokUrl').textContent = d.integration_url;
+    document.getElementById('cfgPhone').value = d.simulator_phone;
+    document.getElementById('cfgName').value = d.simulator_name;
+    document.getElementById('cfgWebhook').value = d.integration_url;
+    updateUI();
+  } catch(e) {}
+
+  // Set today date
+  document.getElementById('todayLabel').textContent = new Date().toLocaleDateString('en-US', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+  });
+
+  // Load initial messages
+  await loadMessages();
+
+  // Start polling for replies
+  pollInterval = setInterval(loadMessages, 2000);
+
+  // Auto-resize textarea
+  const ta = document.getElementById('messageInput');
+  ta.addEventListener('input', () => {
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
+  });
+  ta.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+}
+
+function updateUI() {
+  const initials = config.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+  document.getElementById('sidebarAvatar').textContent = initials;
+  document.getElementById('headerAvatar').textContent = initials;
+  document.getElementById('sidebarName').textContent = config.name;
+  document.getElementById('headerName').textContent = config.name;
+}
+
+// ── Messaging ─────────────────────────────────────────────────────────────────
+async function sendMessage() {
+  const input = document.getElementById('messageInput');
+  const text = input.value.trim();
+  if (!text) return;
+
+  input.value = '';
+  input.style.height = 'auto';
+  messageCount++;
+
+  // Hide empty state
+  document.getElementById('emptyState').style.display = 'none';
+
+  // Render outbound message immediately
+  renderMessage({
+    id: 'local_' + Date.now(),
+    direction: 'inbound', // our user is the "inbound" from WA's perspective
+    message_text: text,
+    created_at: new Date().toISOString(),
+    ai_metadata: null
+  }, true);
+
+  // Show typing indicator
+  showTyping();
+
+  // Log the outgoing payload
+  const logData = {
+    from: config.phone,
+    message: text,
+    type: 'text'
+  };
+  addLog('📤 Sent to Integration Layer', JSON.stringify(logData, null, 2), 'info');
+
+  try {
+    const res = await fetch('/send', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ message: text, phone: config.phone })
+    });
+
+    let data = {};
+    const contentType = res.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      data = await res.json();
+    } else {
+      // Server returned HTML (error page) — show a friendlier message
+      const raw = await res.text();
+      removeTyping();
+      addLog('❌ Non-JSON Response', `HTTP ${res.status}: ${raw.slice(0, 200)}`, 'error');
+      showToast(`⚠️ Server error (HTTP ${res.status}). Check the simulator console.`);
+      return;
+    }
+
+    if (data.error) {
+      removeTyping();
+      addLog('❌ Send Error', data.error, 'error');
+      showToast('⚠️ ' + data.error);
+    } else {
+      addLog('✅ Webhook Accepted', JSON.stringify(data, null, 2), 'success');
+      // Poll immediately and aggressively for the reply
+      setTimeout(loadMessages, 1500);
+      setTimeout(loadMessages, 3000);
+      setTimeout(loadMessages, 5000);
+    }
+  } catch(e) {
+    removeTyping();
+    addLog('❌ Network Error', e.message, 'error');
+    showToast('⚠️ Could not reach simulator server');
+  }
+
+  // Update sidebar preview
+  document.getElementById('sidebarPreview').textContent = text;
+  scrollToBottom();
+}
+
+// ── Message Polling ───────────────────────────────────────────────────────────
+async function loadMessages() {
+  try {
+    let url = `/messages?phone=${config.phone}`;
+    if (lastTimestamp) url += `&since=${encodeURIComponent(lastTimestamp)}`;
+
+    const res = await fetch(url);
+    const data = await res.json();
+    const msgs = data.messages || [];
+
+    if (msgs.length > 0) {
+      removeTyping();
+      document.getElementById('emptyState').style.display = 'none';
+      msgs.forEach(m => {
+        renderMessage(m);
+        lastTimestamp = m.created_at;
+      });
+      scrollToBottom();
+    }
+  } catch(e) {
+    // Silently fail polling
+  }
+}
+
+function renderMessage(msg, isLocal = false) {
+  const container = document.getElementById('messagesContainer');
+  const el = document.createElement('div');
+
+  // Determine direction: outbound from server = AI reply (show on left)
+  const isAiReply = msg.direction === 'outbound';
+  el.className = `message ${isAiReply ? 'inbound' : 'outbound'}`;
+
+  const time = new Date(msg.created_at).toLocaleTimeString('en-US', {
+    hour: '2-digit', minute: '2-digit', hour12: true
+  });
+
+  const intent = msg.ai_metadata?.intent;
+  const intentHtml = intent ? `<span class="intent-badge">${intent}</span>` : '';
+
+  const tick = isAiReply ? '' : `<span class="tick delivered">✓✓</span>`;
+
+  el.innerHTML = `
+    ${isAiReply ? '<span style="font-size:11px;color:#8696a0;display:block;margin-bottom:4px;">🤖 Smartilee AI</span>' : ''}
+    ${escapeHtml(msg.message_text)}
+    <div class="message-meta">
+      ${intentHtml}
+      <span class="message-time">${time}</span>
+      ${tick}
+    </div>
+  `;
+
+  // Poll immediately and aggressively for the reply
+  lastTimestamp = msg.created_at;
+  
+  if (isAiReply && intent === 'start_call') {
+    startCall();
+  } else if (isAiReply && !isLocal) {
+    addLog('🤖 AI Reply Received', JSON.stringify({
+      reply: msg.message_text,
+      intent: intent,
+      direction: msg.direction
+    }, null, 2), 'success');
+
+    document.getElementById('sidebarPreview').textContent = '🤖 ' + msg.message_text;
+  }
+
+  container.appendChild(el);
+}
+
+// ── Typing Indicator ──────────────────────────────────────────────────────────
+function showTyping() {
+  removeTyping();
+  const container = document.getElementById('messagesContainer');
+  typingEl = document.createElement('div');
+  typingEl.className = 'message typing';
+  typingEl.id = 'typingIndicator';
+  typingEl.innerHTML = `
+    <span style="font-size:11px;color:#8696a0;display:block;margin-bottom:6px;">🤖 Smartilee AI is thinking...</span>
+    <div class="typing-dots">
+      <span></span><span></span><span></span>
+    </div>
+  `;
+  container.appendChild(typingEl);
+  scrollToBottom();
+}
+
+function removeTyping() {
+  const el = document.getElementById('typingIndicator');
+  if (el) el.remove();
+  typingEl = null;
+}
+
+// ── Debug Panel ───────────────────────────────────────────────────────────────
+function addLog(label, content, type = 'info') {
+  const container = document.getElementById('logEntries');
+  const el = document.createElement('div');
+  el.className = `log-entry ${type}`;
+  el.innerHTML = `
+    <div class="log-time">${new Date().toLocaleTimeString()}</div>
+    <div class="log-label">${label}</div>
+    <pre>${escapeHtml(content)}</pre>
+  `;
+  container.prepend(el);
+
+  // Keep only 20 entries
+  const entries = container.querySelectorAll('.log-entry');
+  if (entries.length > 20) entries[entries.length - 1].remove();
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.debug-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('[id^="tab-"]').forEach(t => t.style.display = 'none');
+  document.getElementById(`tab-${tab}`).style.display = '';
+  event.target.classList.add('active');
+}
+
+function saveConfig() {
+  config.phone = document.getElementById('cfgPhone').value || config.phone;
+  config.name = document.getElementById('cfgName').value || config.name;
+  updateUI();
+  showToast('✅ Config saved!');
+  addLog('⚙️ Config Updated', JSON.stringify(config, null, 2), 'info');
+}
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+function clearChat() {
+  const c = document.getElementById('messagesContainer');
+  // Keep only date divider and empty state
+  const msgs = c.querySelectorAll('.message');
+  msgs.forEach(m => m.remove());
+  lastTimestamp = null;
+  document.getElementById('emptyState').style.display = '';
+  showToast('Chat cleared');
+}
+
+function scrollToBottom() {
+  const c = document.getElementById('messagesContainer');
+  c.scrollTop = c.scrollHeight;
+}
+
+function escapeHtml(text) {
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\n/g, '<br/>');
+}
+
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2800);
+}
+
+// ── Voice Call Simulation ───────────────────────────────────────────────────
+function startCall() {
+  const overlay = document.getElementById('callOverlay');
+  overlay.style.display = 'flex';
+  document.getElementById('callName').textContent = config.name;
+  document.getElementById('callAvatar').textContent = config.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+  addLog('📞 SIMULATOR', 'Incoming voice call triggered.', 'info');
+  // Play ringtone sound would go here
+}
+
+function acceptCall() {
+  document.getElementById('callStatus').textContent = '00:01';
+  document.getElementById('callStatus').style.color = '#fff';
+  document.querySelector('.call-btn.accept').style.display = 'none';
+  showToast('Connecting audio stream...');
+  
+  // Simulation: automated hang up after 5 seconds
+  setTimeout(() => {
+    endCall();
+    showToast('Call Ended');
+  }, 5000);
+}
+
+function endCall() {
+  document.getElementById('callOverlay').style.display = 'none';
+  document.getElementById('callStatus').textContent = 'WhatsApp Voice Call';
+  document.getElementById('callStatus').style.color = 'var(--wa-green)';
+  document.querySelector('.call-btn.accept').style.display = 'flex';
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>

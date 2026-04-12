@@ -8,7 +8,7 @@ Handles embedding generation and retrieval from Supabase knowledge_base.
 import os
 import logging
 from typing import List, Optional
-from adithyan_inte.supabase_client import supabase
+from supabase_client import supabase
 
 logger = logging.getLogger(__name__)
 

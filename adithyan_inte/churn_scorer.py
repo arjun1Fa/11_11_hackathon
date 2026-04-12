@@ -6,7 +6,7 @@ Weighted churn formula for study abroad students.
 
 import logging
 from datetime import datetime, timezone, timedelta
-from adithyan_inte.supabase_client import supabase
+from supabase_client import supabase
 
 logger = logging.getLogger(__name__)
 
