@@ -13,8 +13,8 @@ def analyze():
     """
     # Import inside the function or at the top if no circular imports
     from app import supabase, llm
-    from intelligence import detect_language, detect_intent, detect_sentiment
-    from rag import retrieve_context
+    from intelligence import detect_language, detect_intent, detect_sentiment, extract_profile_data
+    from rag import retrieve_context, get_chat_history
     from churn_scorer import compute_churn_score
     from decision_engine import decide_action
 
@@ -33,11 +33,33 @@ def analyze():
         preferred_country = None
         has_active_enquiry = False
         
-        customer_resp = supabase.table("customers").select("id, preferred_country").eq("phone_number", phone_number).execute()
+        customer_resp = supabase.table("customers").select("*").eq("phone_number", phone_number).execute()
         customer = customer_resp.data[0] if customer_resp.data else None
         
+        # 2.5 AUTO-CREATE USER
+        # If the integration engineer hasn't created the user, we will do it automatically!
+        if not customer:
+            try:
+                new_user_resp = supabase.table("customers").insert({"phone_number": phone_number}).execute()
+                if new_user_resp.data:
+                    customer = new_user_resp.data[0]
+            except Exception as e:
+                print(f"[WARN] Failed to auto-create user: {e}", file=sys.stderr)
+
         if customer:
             preferred_country = customer.get("preferred_country")
+            # Extract any new profile data from message and update Supabase
+            extracted_data = extract_profile_data(message_text, llm)
+            if extracted_data:
+                try:
+                    supabase.table("customers").update(extracted_data).eq("id", customer["id"]).execute()
+                    # Update local profile object so the rest of the flow sees it
+                    for k, v in extracted_data.items():
+                        customer[k] = v
+                    preferred_country = customer.get("preferred_country")
+                except Exception as db_err:
+                    print(f"[WARN] Failed to auto-update profile: {db_err}", file=sys.stderr)
+
             # Check for active enquiry
             enq_resp = supabase.table("enquiry_events").select("id").eq("customer_id", customer["id"]).eq("status", "active").execute()
             has_active_enquiry = len(enq_resp.data) > 0
@@ -45,23 +67,29 @@ def analyze():
         # 3. Retrieve context (RAG)
         context = retrieve_context(message_text, supabase, filter_country=preferred_country)
 
-        # 4. Detect Intent
-        intent = detect_intent(message_text, context=context, llm=llm)
+        # 4. Fetch Chat History
+        chat_history = ""
+        if customer:
+            chat_history = get_chat_history(customer["id"], supabase)
 
-        # 5. Detect Sentiment
+        # 5. Detect Intent
+        intent = detect_intent(message_text, context=context, chat_history=chat_history, llm=llm)
+
+        # 6. Detect Sentiment
         sentiment = detect_sentiment(message_text, llm=llm)
 
-        # 6. Compute Churn Score
+        # 7. Compute Churn Score
         churn_data = compute_churn_score(phone_number, supabase)
         churn_score = churn_data.get("churn_score", 0.0)
         risk_level = churn_data.get("risk_level", "low")
 
-        # 7. Decide Action
+        # 8. Decide Action
         action = decide_action(
             intent=intent,
             sentiment=sentiment,
             churn_score=churn_score,
-            has_active_enquiry=has_active_enquiry
+            has_active_enquiry=has_active_enquiry,
+            student_profile=customer
         )
 
         return jsonify({

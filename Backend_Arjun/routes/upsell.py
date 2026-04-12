@@ -12,7 +12,7 @@ def upsell_endpoint():
     Returns {upsell_message}
     """
     from app import supabase, llm
-    from rag import retrieve_context
+    from rag import retrieve_context, get_chat_history
     from reply_generator import upsell_reply
     from intelligence import detect_language
 
@@ -35,6 +35,7 @@ def upsell_endpoint():
         
         # Retrieve context mapped to their country (to find upsell opportunities like scholarships)
         rag_context = retrieve_context(message_text, supabase, filter_country=preferred_country)
+        chat_history = get_chat_history(profile.get("id"), supabase) if profile else ""
 
         # Generate upsell reply
         upsell_message = upsell_reply(
@@ -42,6 +43,7 @@ def upsell_endpoint():
             language=language,
             student_profile=profile,
             rag_context=rag_context,
+            chat_history=chat_history,
             llm=llm
         )
 

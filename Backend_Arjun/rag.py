@@ -177,3 +177,42 @@ def retrieve_context(
     except Exception as e:
         print(f"[ERROR] retrieve_context failed: {e}", file=sys.stderr)
         return ""
+
+# ── Retrieve Chat History ─────────────────────────────────────────────────────
+
+def get_chat_history(customer_id: str, supabase: Client) -> str:
+    """
+    Fetch the last 4 messages for a student and format them into a single string.
+    This gives the LLM short-term conversational memory.
+    """
+    try:
+        if not customer_id:
+            return "No previous conversation history."
+            
+        resp = (
+            supabase.table("conversations")
+            .select("direction, message_text")
+            .eq("customer_id", customer_id)
+            .order("timestamp", desc=True)
+            .limit(4)
+            .execute()
+        )
+        
+        messages = resp.data or []
+        if not messages:
+            return "No previous conversation history."
+            
+        # Reverse to chronological order (oldest -> newest)
+        messages.reverse()
+        
+        formatted_parts = []
+        for msg in messages:
+            sender = "Student" if msg.get("direction") == "inbound" else "AI Counsellor"
+            text = msg.get("message_text", "")
+            formatted_parts.append(f"{sender}: {text}")
+            
+        return "\n".join(formatted_parts)
+        
+    except Exception as e:
+        print(f"[ERROR] get_chat_history failed: {e}", file=sys.stderr)
+        return "No previous conversation history."

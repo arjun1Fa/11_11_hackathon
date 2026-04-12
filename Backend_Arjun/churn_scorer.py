@@ -124,7 +124,7 @@ def _message_drop_rate(customer_id: str, supabase: Client) -> float:
             .select("id", count="exact")
             .eq("customer_id", customer_id)
             .eq("direction", "inbound")
-            .gte("created_at", last7_start)
+            .gte("timestamp", last7_start)
             .execute()
         )
         last7 = last7_resp.count or 0
@@ -134,8 +134,8 @@ def _message_drop_rate(customer_id: str, supabase: Client) -> float:
             .select("id", count="exact")
             .eq("customer_id", customer_id)
             .eq("direction", "inbound")
-            .gte("created_at", prior7_start)
-            .lt("created_at", prior7_end)
+            .gte("timestamp", prior7_start)
+            .lt("timestamp", prior7_end)
             .execute()
         )
         prior7 = prior7_resp.count or 0
@@ -176,10 +176,10 @@ def compute_churn_score(phone_number: str, supabase: Client) -> dict:
             supabase.table("customers")
             .select("id, last_active")
             .eq("phone_number", phone_number)
-            .single()
+            .limit(1)
             .execute()
         )
-        customer = resp.data
+        customer = resp.data[0] if resp.data else None
 
         if not customer:
             print(f"[WARN] No customer found for {phone_number}", file=sys.stderr)

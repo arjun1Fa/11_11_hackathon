@@ -11,6 +11,7 @@ ACTION_AUTO_REPLY       = "auto_reply"
 ACTION_UPSELL           = "upsell"
 ACTION_HANDOFF          = "handoff"
 ACTION_SCHEDULE_FOLLOWUP = "schedule_followup"
+ACTION_ONBOARDING       = "onboarding"
 
 
 def decide_action(
@@ -18,6 +19,7 @@ def decide_action(
     sentiment: str,
     churn_score: float,
     has_active_enquiry: bool,
+    student_profile: dict = None,
 ) -> str:
     """
     Determine the correct action for this student message based on four signals.
@@ -49,6 +51,15 @@ def decide_action(
     Returns:
         One of: auto_reply, upsell, handoff, schedule_followup.
     """
+
+    # Rule 0 — Incomplete profile → force onboarding
+    if not student_profile:
+        return ACTION_ONBOARDING
+
+    required_fields = ["name", "preferred_country", "education_level", "field_of_study", "ielts_score"]
+    for field in required_fields:
+        if student_profile.get(field) is None:
+            return ACTION_ONBOARDING
 
     # Rule 1 — Unhappy student with a complaint → human handoff immediately
     if sentiment == "negative" and intent == "complaint":
